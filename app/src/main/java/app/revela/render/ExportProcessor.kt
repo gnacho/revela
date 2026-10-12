@@ -37,19 +37,28 @@ object ExportProcessor {
         options: ExportOptions
     ): Result<Uri> = withContext(Dispatchers.IO) {
         runCatching {
+            android.util.Log.i("revela", "export: inicio")
             val resolver = context.contentResolver
 
             // 1. Decodificar fuente acotada
+            android.util.Log.i("revela", "export: uri=$sourceUri")
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            resolver.openInputStream(sourceUri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            val boundsStream = resolver.openInputStream(sourceUri)
                 ?: error("no se pudo abrir la imagen de origen")
+            boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                error("no se pudieron leer las dimensiones de la imagen de origen")
+            }
+            android.util.Log.i("revela", "export: fuente ${bounds.outWidth}x${bounds.outHeight}")
             var sample = 1
             val srcMax = maxOf(bounds.outWidth, bounds.outHeight)
             if (options.maxSide > 0) {
                 while (srcMax / (sample * 2) >= options.maxSide) sample *= 2
             }
             val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sample }
-            val src = resolver.openInputStream(sourceUri)?.use {
+            val decodeStream = resolver.openInputStream(sourceUri)
+                ?: error("no se pudo abrir la imagen de origen (2)")
+            val src = decodeStream.use {
                 BitmapFactory.decodeStream(it, null, decodeOpts)
             } ?: error("no se pudo decodificar la imagen de origen")
 
@@ -95,6 +104,10 @@ object ExportProcessor {
             val out = Bitmap.createBitmap(pixels, cropped.width, cropped.height, Bitmap.Config.ARGB_8888)
 
             // 4. Guardar: fichero temporal -> EXIF -> MediaStore
+            android.util.Log.i(
+                "revela",
+                "export: salida ${cropped.width}x${cropped.height} png=${options.png}"
+            )
             val mime = if (options.png) "image/png" else "image/jpeg"
             val ext = if (options.png) "png" else "jpg"
             val stamp = System.currentTimeMillis()
@@ -119,6 +132,7 @@ object ExportProcessor {
             }
             val target = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
                 ?: error("MediaStore rechazo la insercion")
+            android.util.Log.i("revela", "export: insert ok -> $target")
             resolver.openOutputStream(target)?.use { os ->
                 temp.inputStream().use { it.copyTo(os) }
             } ?: error("no se pudo escribir en MediaStore")

@@ -149,6 +149,7 @@ fun EditorScreen() {
     var renderJob by remember { mutableStateOf<Job?>(null) }
     var workingGeometry by remember { mutableStateOf<GeometryModel?>(null) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var cropDrawMode by remember { mutableStateOf(false) }
     var viewScale by remember { mutableFloatStateOf(1f) }
     var viewOffset by remember { mutableStateOf(Offset.Zero) }
 
@@ -461,6 +462,7 @@ fun EditorScreen() {
                             modifier = Modifier.matchParentSize(),
                             geometry = cropWorking,
                             frameAspect = frameAspect,
+                            drawMode = cropDrawMode,
                             onGeometry = { workingGeometry = it }
                         )
                     }
@@ -518,8 +520,11 @@ fun EditorScreen() {
                 CropPanel(
                     geometry = cropWorking ?: geometry,
                     frameAspect = frameAspect0,
+                    drawMode = cropDrawMode,
+                    onDrawModeChange = { cropDrawMode = it },
                     onChange = { workingGeometry = it },
                     onCommit = {
+                        android.util.Log.d("revela", "crop commit working=$workingGeometry")
                         workingGeometry?.let {
                             geometry = it
                             persistSession()
@@ -586,6 +591,9 @@ fun EditorScreen() {
                     val result = ExportProcessor.export(
                         context, sourceUri!!, stack, geometry, options
                     )
+                    result.onFailure {
+                        android.util.Log.e("revela", "export fallo", it)
+                    }
                     Toast.makeText(
                         context,
                         if (result.isSuccess) "Guardado en Imagenes/revela"
@@ -792,6 +800,8 @@ private var draggingIndex by mutableStateOf(-1)
 fun CropPanel(
     geometry: GeometryModel,
     frameAspect: Float,
+    drawMode: Boolean,
+    onDrawModeChange: (Boolean) -> Unit,
     onChange: (GeometryModel) -> Unit,
     onCommit: () -> Unit,
     onCancel: () -> Unit
@@ -803,6 +813,21 @@ fun CropPanel(
             .navigationBarsPadding()
             .padding(12.dp)
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+        ) {
+            FilterChip(
+                selected = !drawMode,
+                onClick = { onDrawModeChange(false) },
+                label = { Text("Ajustar caja", fontSize = 12.sp) }
+            )
+            FilterChip(
+                selected = drawMode,
+                onClick = { onDrawModeChange(true) },
+                label = { Text("Dibujar seleccion", fontSize = 12.sp) }
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
@@ -909,11 +934,13 @@ fun CropOverlay(
     modifier: Modifier = Modifier,
     geometry: GeometryModel,
     frameAspect: Float,
+    drawMode: Boolean,
     onGeometry: (GeometryModel) -> Unit
 ) {
     var viewport by remember { mutableStateOf(IntSize.Zero) }
     val geometryRef = rememberUpdatedState(geometry)
     val onGeometryRef = rememberUpdatedState(onGeometry)
+    val drawModeRef = rememberUpdatedState(drawMode)
     var handle by remember { mutableStateOf<Handle?>(null) }
     var mode by remember { mutableStateOf(CropMode.NONE) }
     var moveOffset by remember { mutableStateOf(Offset.Zero) }
@@ -930,25 +957,35 @@ fun CropOverlay(
                         val g = geometryRef.value
                         val w = viewport.width.toFloat()
                         val h = viewport.height.toFloat()
-                        val h0 = hitHandle(pos, g, w, h, handlePx)
-                        when {
-                            h0 != null -> {
-                                handle = h0
-                                mode = CropMode.RESIZE
-                            }
-                            pos.x in g.cropLeft * w..g.cropRight * w &&
-                                pos.y in g.cropTop * h..g.cropBottom * h -> {
-                                mode = CropMode.MOVE
-                                moveOffset = Offset(
-                                    pos.x - g.cropLeft * w,
-                                    pos.y - g.cropTop * h
-                                )
-                            }
-                            else -> {
-                                mode = CropMode.DRAW
-                                drawStart = pos
+                        if (drawModeRef.value) {
+                            mode = CropMode.DRAW
+                            drawStart = pos
+                            handle = null
+                        } else {
+                            val h0 = hitHandle(pos, g, w, h, handlePx)
+                            when {
+                                h0 != null -> {
+                                    handle = h0
+                                    mode = CropMode.RESIZE
+                                }
+                                pos.x in g.cropLeft * w..g.cropRight * w &&
+                                    pos.y in g.cropTop * h..g.cropBottom * h -> {
+                                    mode = CropMode.MOVE
+                                    moveOffset = Offset(
+                                        pos.x - g.cropLeft * w,
+                                        pos.y - g.cropTop * h
+                                    )
+                                }
+                                else -> {
+                                    mode = CropMode.DRAW
+                                    drawStart = pos
+                                }
                             }
                         }
+                        android.util.Log.d(
+                            "revela",
+                            "crop start pos=$pos mode=$mode handle=$handle viewport=$viewport geom=${geometryRef.value}"
+                        )
                     },
                     onDrag = { change, _ ->
                         change.consume()
@@ -987,6 +1024,7 @@ fun CropOverlay(
                                     Handle.BOTTOM -> b = dy.coerceIn(t + minSize, 1f)
                                     null -> {}
                                 }
+                                android.util.Log.d("revela", "crop resize -> $l,$t,$r,$b")
                                 onGeometryRef.value(
                                     g.copy(cropLeft = l, cropTop = t, cropRight = r, cropBottom = b)
                                 )
@@ -999,6 +1037,7 @@ fun CropOverlay(
                                     .coerceIn(0f, 1f - cw)
                                 val t = ((change.position.y - moveOffset.y) / h)
                                     .coerceIn(0f, 1f - ch)
+                                android.util.Log.d("revela", "crop move -> $l,$t")
                                 onGeometryRef.value(
                                     g.copy(cropLeft = l, cropTop = t, cropRight = l + cw, cropBottom = t + ch)
                                 )
@@ -1010,6 +1049,7 @@ fun CropOverlay(
                                 val r = max(drawStart.x, p.x) / w
                                 val t = min(drawStart.y, p.y) / h
                                 val b = max(drawStart.y, p.y) / h
+                                android.util.Log.d("revela", "crop draw -> $l,$t,$r,$b")
                                 if (r - l > minSize / 2f && b - t > minSize / 2f) {
                                     onGeometryRef.value(
                                         g.copy(
