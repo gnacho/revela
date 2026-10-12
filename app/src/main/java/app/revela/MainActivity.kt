@@ -15,10 +15,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.absoluteOffset
@@ -175,19 +178,29 @@ fun EditorScreen() {
     val pickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
+        android.util.Log.i("revela", "picker result uri=$uri")
         if (uri != null) {
             scope.launch {
-                val loaded = PreviewRender.decode(context.contentResolver, uri)
-                base = loaded
-                originalBitmap = loaded?.toBitmap()
-                sourceUri = uri
-                activeTool = null
-                workingAdj = null
-                workingGeometry = null
-                val restored = loaded?.let { SessionStore.load(context, uri) }
-                stack = restored?.first ?: EditStack()
-                geometry = restored?.second ?: GeometryModel()
-                stackVersion++
+                runCatching {
+                    val loaded = PreviewRender.decode(context.contentResolver, uri)
+                    android.util.Log.i(
+                        "revela",
+                        "decode ok=${loaded != null} ${loaded?.width}x${loaded?.height}"
+                    )
+                    base = loaded
+                    originalBitmap = loaded?.toBitmap()
+                    sourceUri = uri
+                    activeTool = null
+                    workingAdj = null
+                    workingGeometry = null
+                    val restored = loaded?.let { SessionStore.load(context, uri) }
+                    stack = restored?.first ?: EditStack()
+                    geometry = restored?.second ?: GeometryModel()
+                    stackVersion++
+                }.onFailure {
+                    android.util.Log.e("revela", "error al abrir imagen", it)
+                    Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
@@ -452,8 +465,19 @@ fun EditorScreen() {
                 val baseAspect0 = base?.let { it.width.toFloat() / it.height.toFloat() } ?: 1f
                 val odd0 = ((g0.quarterTurns % 4) + 4) % 4 % 2 == 1
                 val frameAspect0 = if (odd0) 1f / baseAspect0 else baseAspect0
+                // Caja inicial: 80% centrada (si la actual ocupa todo el marco)
+                LaunchedEffect(sourceUri, activeTool) {
+                    if (activeTool == EditorTool.CROP && workingGeometry == null &&
+                        g0.cropLeft <= 0f && g0.cropTop <= 0f &&
+                        g0.cropRight >= 1f && g0.cropBottom >= 1f
+                    ) {
+                        workingGeometry = g0.copy(
+                            cropLeft = 0.1f, cropTop = 0.1f, cropRight = 0.9f, cropBottom = 0.9f
+                        )
+                    }
+                }
                 CropPanel(
-                    geometry = g0,
+                    geometry = cropWorking ?: geometry,
                     frameAspect = frameAspect0,
                     onChange = { workingGeometry = it },
                     onCommit = {
@@ -565,10 +589,17 @@ fun coverScale(angleDeg: Float, contentAspect: Float): Float {
 
 @Composable
 fun ToolRail(modifier: Modifier = Modifier, enabled: Boolean, onSelect: (EditorTool) -> Unit) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.SpaceEvenly) {
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         EditorTool.entries.forEach { tool ->
-            OutlinedButton(onClick = { onSelect(tool) }, enabled = enabled) {
-                Text(tool.label, fontSize = 12.sp)
+            OutlinedButton(
+                onClick = { onSelect(tool) },
+                enabled = enabled,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(tool.label, fontSize = 11.sp, maxLines = 1, softWrap = false)
             }
         }
     }
@@ -830,8 +861,10 @@ private fun centeredRatioRect(
 }
 
 private enum class Handle {
-    MOVE, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, LEFT, RIGHT, TOP, BOTTOM
+    TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, LEFT, RIGHT, TOP, BOTTOM
 }
+
+private enum class CropMode { NONE, RESIZE, MOVE, DRAW }
 
 @Composable
 fun CropOverlay(
@@ -843,7 +876,10 @@ fun CropOverlay(
     var viewport by remember { mutableStateOf(IntSize.Zero) }
     val geometryRef = rememberUpdatedState(geometry)
     val onGeometryRef = rememberUpdatedState(onGeometry)
-    var activeHandle by remember { mutableStateOf<Handle?>(null) }
+    var handle by remember { mutableStateOf<Handle?>(null) }
+    var mode by remember { mutableStateOf(CropMode.NONE) }
+    var moveOffset by remember { mutableStateOf(Offset.Zero) }
+    var drawStart by remember { mutableStateOf(Offset.Zero) }
     val handlePx = with(LocalDensity.current) { 26.dp.toPx() }
 
     Box(
@@ -853,70 +889,128 @@ fun CropOverlay(
                 if (viewport.width == 0 || viewport.height == 0) return@pointerInput
                 detectDragGestures(
                     onDragStart = { pos ->
-                        activeHandle = hitHandle(
-                            pos, geometryRef.value,
-                            viewport.width.toFloat(), viewport.height.toFloat(), handlePx
-                        )
-                    },
-                    onDrag = { change, amount ->
-                        change.consume()
-                        val handle = activeHandle ?: return@detectDragGestures
                         val g = geometryRef.value
                         val w = viewport.width.toFloat()
                         val h = viewport.height.toFloat()
-                        val dx = amount.x / w
-                        val dy = amount.y / h
-                        var l = g.cropLeft
-                        var t = g.cropTop
-                        var r = g.cropRight
-                        var b = g.cropBottom
-                        val minSize = 0.1f
-                        when (handle) {
-                            Handle.MOVE -> {
-                                val cw = r - l
-                                val ch = b - t
-                                l = (l + dx).coerceIn(0f, 1f - cw)
-                                t = (t + dy).coerceIn(0f, 1f - ch)
-                                r = l + cw
-                                b = t + ch
+                        val h0 = hitHandle(pos, g, w, h, handlePx)
+                        when {
+                            h0 != null -> {
+                                handle = h0
+                                mode = CropMode.RESIZE
                             }
-                            Handle.TOP_LEFT -> {
-                                l = (l + dx).coerceIn(0f, r - minSize)
-                                t = (t + dy).coerceIn(0f, b - minSize)
+                            pos.x in g.cropLeft * w..g.cropRight * w &&
+                                pos.y in g.cropTop * h..g.cropBottom * h -> {
+                                mode = CropMode.MOVE
+                                moveOffset = Offset(
+                                    pos.x - g.cropLeft * w,
+                                    pos.y - g.cropTop * h
+                                )
                             }
-                            Handle.TOP_RIGHT -> {
-                                r = (r + dx).coerceIn(l + minSize, 1f)
-                                t = (t + dy).coerceIn(0f, b - minSize)
+                            else -> {
+                                mode = CropMode.DRAW
+                                drawStart = pos
                             }
-                            Handle.BOTTOM_LEFT -> {
-                                l = (l + dx).coerceIn(0f, r - minSize)
-                                b = (b + dy).coerceIn(t + minSize, 1f)
-                            }
-                            Handle.BOTTOM_RIGHT -> {
-                                r = (r + dx).coerceIn(l + minSize, 1f)
-                                b = (b + dy).coerceIn(t + minSize, 1f)
-                            }
-                            Handle.LEFT -> l = (l + dx).coerceIn(0f, r - minSize)
-                            Handle.RIGHT -> r = (r + dx).coerceIn(l + minSize, 1f)
-                            Handle.TOP -> t = (t + dy).coerceIn(0f, b - minSize)
-                            Handle.BOTTOM -> b = (b + dy).coerceIn(t + minSize, 1f)
                         }
-                        onGeometryRef.value(
-                            g.copy(cropLeft = l, cropTop = t, cropRight = r, cropBottom = b)
-                        )
                     },
-                    onDragEnd = { activeHandle = null },
-                    onDragCancel = { activeHandle = null }
+                    onDrag = { change, _ ->
+                        change.consume()
+                        val g = geometryRef.value
+                        val w = viewport.width.toFloat()
+                        val h = viewport.height.toFloat()
+                        val minSize = 0.1f
+                        when (mode) {
+                            CropMode.RESIZE -> {
+                                val dx = change.position.x / w
+                                val dy = change.position.y / h
+                                var l = g.cropLeft
+                                var t = g.cropTop
+                                var r = g.cropRight
+                                var b = g.cropBottom
+                                when (handle) {
+                                    Handle.TOP_LEFT -> {
+                                        l = dx.coerceIn(0f, r - minSize)
+                                        t = dy.coerceIn(0f, b - minSize)
+                                    }
+                                    Handle.TOP_RIGHT -> {
+                                        r = dx.coerceIn(l + minSize, 1f)
+                                        t = dy.coerceIn(0f, b - minSize)
+                                    }
+                                    Handle.BOTTOM_LEFT -> {
+                                        l = dx.coerceIn(0f, r - minSize)
+                                        b = dy.coerceIn(t + minSize, 1f)
+                                    }
+                                    Handle.BOTTOM_RIGHT -> {
+                                        r = dx.coerceIn(l + minSize, 1f)
+                                        b = dy.coerceIn(t + minSize, 1f)
+                                    }
+                                    Handle.LEFT -> l = dx.coerceIn(0f, r - minSize)
+                                    Handle.RIGHT -> r = dx.coerceIn(l + minSize, 1f)
+                                    Handle.TOP -> t = dy.coerceIn(0f, b - minSize)
+                                    Handle.BOTTOM -> b = dy.coerceIn(t + minSize, 1f)
+                                    null -> {}
+                                }
+                                onGeometryRef.value(
+                                    g.copy(cropLeft = l, cropTop = t, cropRight = r, cropBottom = b)
+                                )
+                            }
+
+                            CropMode.MOVE -> {
+                                val cw = g.cropRight - g.cropLeft
+                                val ch = g.cropBottom - g.cropTop
+                                val l = ((change.position.x - moveOffset.x) / w)
+                                    .coerceIn(0f, 1f - cw)
+                                val t = ((change.position.y - moveOffset.y) / h)
+                                    .coerceIn(0f, 1f - ch)
+                                onGeometryRef.value(
+                                    g.copy(cropLeft = l, cropTop = t, cropRight = l + cw, cropBottom = t + ch)
+                                )
+                            }
+
+                            CropMode.DRAW -> {
+                                val p = change.position
+                                val l = min(drawStart.x, p.x) / w
+                                val r = max(drawStart.x, p.x) / w
+                                val t = min(drawStart.y, p.y) / h
+                                val b = max(drawStart.y, p.y) / h
+                                if (r - l > minSize / 2f && b - t > minSize / 2f) {
+                                    onGeometryRef.value(
+                                        g.copy(
+                                            cropLeft = l.coerceIn(0f, 1f),
+                                            cropTop = t.coerceIn(0f, 1f),
+                                            cropRight = r.coerceIn(0f, 1f),
+                                            cropBottom = b.coerceIn(0f, 1f)
+                                        )
+                                    )
+                                }
+                            }
+
+                            CropMode.NONE -> {}
+                        }
+                    },
+                    onDragEnd = {
+                        // descarta selecciones minusculas dibujadas por error
+                        val g = geometryRef.value
+                        if (mode == CropMode.DRAW && (g.cropWidthNorm < 0.06f || g.cropHeightNorm < 0.06f)) {
+                            onGeometryRef.value(g.copy(cropLeft = 0.1f, cropTop = 0.1f, cropRight = 0.9f, cropBottom = 0.9f))
+                        }
+                        mode = CropMode.NONE
+                        handle = null
+                    },
+                    onDragCancel = {
+                        mode = CropMode.NONE
+                        handle = null
+                    }
                 )
             }
     ) {
         Canvas(Modifier.matchParentSize()) {
             val w = size.width
             val h = size.height
-            val l = geometryRef.value.cropLeft * w
-            val t = geometryRef.value.cropTop * h
-            val r = geometryRef.value.cropRight * w
-            val b = geometryRef.value.cropBottom * h
+            val g = geometryRef.value
+            val l = g.cropLeft * w
+            val t = g.cropTop * h
+            val r = g.cropRight * w
+            val b = g.cropBottom * h
             val dim = Color.Black.copy(alpha = 0.55f)
             drawRect(dim, Offset(0f, 0f), Size(w, t))
             drawRect(dim, Offset(0f, b), Size(w, h - b))
@@ -928,6 +1022,19 @@ fun CropOverlay(
                 size = Size(r - l, b - t),
                 style = Stroke(width = 2f)
             )
+            // tercios
+            val cw = r - l
+            val ch = b - t
+            for (f in listOf(1f / 3f, 2f / 3f)) {
+                drawLine(
+                    Color.White.copy(alpha = 0.4f),
+                    Offset(l + cw * f, t), Offset(l + cw * f, b), strokeWidth = 1.5f
+                )
+                drawLine(
+                    Color.White.copy(alpha = 0.4f),
+                    Offset(l, t + ch * f), Offset(r, t + ch * f), strokeWidth = 1.5f
+                )
+            }
             val cornerLen = 42f
             fun corner(hx: Float, hy: Float, sx: Float, sy: Float) {
                 drawLine(
@@ -953,7 +1060,7 @@ private fun hitHandle(
     w: Float,
     h: Float,
     radius: Float
-): Handle {
+): Handle? {
     val l = g.cropLeft * w
     val t = g.cropTop * h
     val r = g.cropRight * w
@@ -964,12 +1071,11 @@ private fun hitHandle(
         near(r, t) -> Handle.TOP_RIGHT
         near(l, b) -> Handle.BOTTOM_LEFT
         near(r, b) -> Handle.BOTTOM_RIGHT
-        abs(pos.y - t) <= radius && pos.x in l..r -> Handle.TOP
-        abs(pos.y - b) <= radius && pos.x in l..r -> Handle.BOTTOM
         abs(pos.x - l) <= radius && pos.y in t..b -> Handle.LEFT
         abs(pos.x - r) <= radius && pos.y in t..b -> Handle.RIGHT
-        pos.x in l..r && pos.y in t..b -> Handle.MOVE
-        else -> Handle.MOVE
+        abs(pos.y - t) <= radius && pos.x in l..r -> Handle.TOP
+        abs(pos.y - b) <= radius && pos.x in l..r -> Handle.BOTTOM
+        else -> null
     }
 }
 

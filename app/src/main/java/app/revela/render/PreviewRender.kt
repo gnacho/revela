@@ -22,8 +22,16 @@ object PreviewRender {
     /** Decodifica la imagen a tamano de preview (lado mayor acotado). */
     suspend fun decode(resolver: ContentResolver, uri: Uri): BaseImage? = withContext(Dispatchers.IO) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-            ?: return@withContext null
+        val boundsStream = resolver.openInputStream(uri)
+        if (boundsStream == null) {
+            android.util.Log.e("revela", "decode: openInputStream null (bounds)")
+            return@withContext null
+        }
+        boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
+        android.util.Log.i(
+            "revela",
+            "decode bounds=${bounds.outWidth}x${bounds.outHeight} mime=${bounds.outMimeType}"
+        )
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@withContext null
 
         var sample = 1
@@ -34,12 +42,22 @@ object PreviewRender {
             inSampleSize = sample
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
-        val bmp = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
-            ?: return@withContext null
+        val decodeStream = resolver.openInputStream(uri)
+        if (decodeStream == null) {
+            android.util.Log.e("revela", "decode: openInputStream null (decode)")
+            return@withContext null
+        }
+        val bmp = decodeStream.use { BitmapFactory.decodeStream(it, null, opts) }
+        if (bmp == null) {
+            android.util.Log.e("revela", "decode: bitmap null")
+            return@withContext null
+        }
         val pixels = IntArray(bmp.width * bmp.height)
         bmp.getPixels(pixels, 0, bmp.width, 0, 0, bmp.width, bmp.height)
+        val w = bmp.width
+        val h = bmp.height
         bmp.recycle()
-        BaseImage(pixels, bmp.width, bmp.height)
+        BaseImage(pixels, w, h)
     }
 
     /** Renderiza la preview con los ajustes indicados (o la original si identity). */
