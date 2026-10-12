@@ -34,9 +34,10 @@ updated: "2026-10-12"
 - [x] FASE 2: Selectivo (puntos drag/chips/borrado), Vineta, Estilos (7 looks), Sanar (inpaint difusion Kotlin sin OpenCV) <!-- completed: 2026-10-12 -->
 - [x] FASE 2: 37/37 tests + validacion en emulador (vineta medida, B/N sat 0.013, punto selectivo persistido con brightness, inpaint visible) <!-- completed: 2026-10-12 -->
 
-### Blocked
+### Completed (extra)
 
-- [ ] Instalacion en el OPPO fisico: reconexion USB estable o emparejamiento WiFi adb <!-- added: 2026-10-12, reason: cable flaky -->
+- [x] FASE 2: validacion tactil en el OPPO fisico (Android 16): exposure +1.5EV + enderezado 4.7deg sobre foto real, sesion persistida, sin perdidas al plegar <!-- completed: 2026-10-12 -->
+- [x] FASE 2: pulido crop (18dp + slider fila propia) instalado y validado en el OPPO <!-- completed: 2026-10-12 -->
 
 ## Changelog
 
