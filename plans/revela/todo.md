@@ -20,27 +20,22 @@ updated: "2026-10-12"
 
 ### Pending
 
-- [ ] Validar fase 0+1 en movil: adb install + flujo completo (ajustes, curvas, recorte, export) <!-- added: 2026-10-12 -->
-- [ ] Detectar version de Android del movil via adb y fijar targetSdk definitivo <!-- added: 2026-10-12 -->
+- [ ] Validar en el OPPO fisico: instalacion + gestos tactiles + rendimiento (el cable es flaky; pendiente WiFi adb) <!-- added: 2026-10-12 -->
+- [ ] Pulir radios de agarre del recorte (26dp -> ~18dp) y layout del slider Enderezar en pantallas estrechas <!-- added: 2026-10-12 -->
 
 ### In Progress
 
 ### Completed
 
-- [x] FASE 0: Descargar cmdline-tools oficiales e instalar en ~/Android/Sdk (sin root) <!-- completed: 2026-10-12, cmdline-tools 22.0 -->
-- [x] FASE 0: Aceptar licencias e instalar platform-tools + platforms + build-tools <!-- completed: 2026-10-12, platform-tools 37.0.1 + android-37.0 + build-tools 36.0.0 -->
-- [x] FASE 0: Esqueleto Gradle Kotlin DSL + Compose (app.revela, minSdk 29) + .gitignore <!-- completed: 2026-10-12, AGP 9.4.1 + Gradle 9.8.1 + Kotlin 2.4.21, compileSdk 37 -->
-- [x] FASE 0: Pantalla basica con Photo Picker y zoom/pan <!-- completed: 2026-10-12 -->
-- [x] FASE 0: ./gradlew assembleDebug exit 0 <!-- completed: 2026-10-12 -->
-- [x] FASE 1: Nucleo puro Kotlin (EditStack undo/redo, ColorMath LUTs, CurveMath monotona, GeometryModel) + 24/24 tests JVM <!-- completed: 2026-10-12, b81af78 -->
-- [x] FASE 1: UI editor completa (rail de herramientas, gestos horizontales, editor de curvas interactivo, recorte con tiradores + ratios + enderezado, comparar original, export con dialogo) <!-- completed: 2026-10-12 -->
-- [x] FASE 1: Export resolucion completa via MediaStore (Imagenes/revela) con EXIF copiado y orientacion horneada <!-- completed: 2026-10-12 -->
-- [x] FASE 1: Persistencia de sesion por imagen (JSON en filesDir) <!-- completed: 2026-10-12 -->
-- [x] FASE 1: assembleDebug + testDebugUnitTest exit 0 (APK 62 MB debug sin minificar) <!-- completed: 2026-10-12 -->
+- [x] FASE 0: toolchain + esqueleto + build <!-- completed: 2026-10-12 -->
+- [x] FASE 1: nucleo + UI + export + 24/24 tests <!-- completed: 2026-10-12, b81af78 -->
+- [x] FASE 1: banco de pruebas emulador headless (KVM, API 36) + imagen sintetica de test <!-- completed: 2026-10-12 -->
+- [x] FASE 1: validacion completa en emulador (picker, exposicion +0.7EV medido, curvas UI, recorte Dibujar con log de rect, rotacion sin deformar, export 734x776 verificado en Imagenes/revela) <!-- completed: 2026-10-12, 683957a -->
+- [x] Fixes: export bounds-trap, deformacion por rotacion, recorte v2 (80% + modos Ajustar/Dibujar), pinch zoom, configChanges plegable <!-- completed: 2026-10-12 -->
 
 ### Blocked
 
-- [ ] Instalacion y validacion en movil (fases 0 y 1): bloqueada hasta que el usuario conecte el movil con depuracion USB <!-- added: 2026-10-12, reason: adb devices vacio -->
+- [ ] Instalacion en el OPPO fisico: bloqueada hasta reconexion USB estable o emparejamiento WiFi adb <!-- added: 2026-10-12, reason: cable flaky -->
 
 ## Changelog
 
