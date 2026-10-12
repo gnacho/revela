@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -148,6 +149,14 @@ fun EditorScreen() {
     var renderJob by remember { mutableStateOf<Job?>(null) }
     var workingGeometry by remember { mutableStateOf<GeometryModel?>(null) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var viewScale by remember { mutableFloatStateOf(1f) }
+    var viewOffset by remember { mutableStateOf(Offset.Zero) }
+
+    // Al abrir una herramienta se resetea el zoom de inspeccion
+    LaunchedEffect(activeTool, sourceUri) {
+        viewScale = 1f
+        viewOffset = Offset.Zero
+    }
 
     val cropWorking = if (activeTool == EditorTool.CROP) (workingGeometry ?: geometry) else null
 
@@ -366,25 +375,55 @@ fun EditorScreen() {
                 val frameHdp = with(density) { frameH.toDp() }
                 val boxWdp = with(density) { w.toDp() }
                 val boxHdp = with(density) { h.toDp() }
+                // El elemento imagen se dimensiona SIN girar; tras rotationZ ocupa el marco exacto
+                val oddTurnsImg = ((g.quarterTurns % 4) + 4) % 4 % 2 == 1
+                val imgWdp = if (oddTurnsImg) frameHdp else frameWdp
+                val imgHdp = if (oddTurnsImg) frameWdp else frameHdp
 
+                // Zoom de inspeccion con dos dedos (solo sin herramienta activa)
+                val toolNow = activeTool
                 Box(
                     modifier = Modifier
                         .requiredSize(boxWdp, boxHdp)
                         .clipToBounds()
+                        .graphicsLayer {
+                            scaleX = viewScale
+                            scaleY = viewScale
+                            translationX = viewOffset.x
+                            translationY = viewOffset.y
+                        }
+                        .let { mod ->
+                            if (toolNow == null) {
+                                mod.pointerInput(b) {
+                                    detectTransformGestures { _, pan, zoom, _ ->
+                                        viewScale = (viewScale * zoom).coerceIn(1f, 6f)
+                                        viewOffset += pan
+                                    }
+                                }
+                            } else {
+                                mod
+                            }
+                        }
                 ) {
-                    Image(
-                        bitmap = bmp.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.FillBounds,
+                    Box(
                         modifier = Modifier
                             .requiredSize(frameWdp, frameHdp)
-                            .absoluteOffset(offsetXdp, offsetYdp)
-                            .graphicsLayer {
-                                rotationZ = g.totalRotationDeg
-                                scaleX = cover
-                                scaleY = cover
-                            }
-                    )
+                            .absoluteOffset(offsetXdp, offsetYdp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            bitmap = bmp.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.FillBounds,
+                            modifier = Modifier
+                                .requiredSize(imgWdp, imgHdp)
+                                .graphicsLayer {
+                                    rotationZ = g.totalRotationDeg
+                                    scaleX = cover
+                                    scaleY = cover
+                                }
+                        )
+                    }
 
                     // Gestos de ajuste (herramientas de color)
                     val tool = activeTool
@@ -494,7 +533,6 @@ fun EditorScreen() {
                     }
                 )
             }
-
             EditorTool.WHITE_BALANCE -> Column(
                 modifier = Modifier
                     .fillMaxWidth()
