@@ -3,7 +3,7 @@ type: planning
 entity: phase
 plan: "revela"
 phase: 0
-status: pending
+status: in_progress
 created: "2026-10-12"
 updated: "2026-10-12"
 ---
