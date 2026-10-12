@@ -9,33 +9,34 @@ updated: "2026-10-12"
 
 > Tracking [revela](plan.md)
 
-## Active Phase: 1 - Motor no destructivo + geometria + export
+## Active Phase: 2 - Selectivo + looks + healing
 
 ### Phase Context
 
-- **Scope**: [Phase 1](phases/phase-1.md)
+- **Scope**: [Phase 2](phases/phase-2.md)
 - **Implementation**: Not authored yet
 - **Latest Handover**: None
-- **Relevant Docs**: plan.md (decisiones), phases/phase-1.md Notes (decision pipeline CPU)
+- **Relevant Docs**: plan.md, phases/phase-1.md Notes (pipeline CPU), phases/phase-2.md
 
 ### Pending
 
-- [ ] Validar en el OPPO fisico: instalacion + gestos tactiles + rendimiento (el cable es flaky; pendiente WiFi adb) <!-- added: 2026-10-12 -->
-- [ ] Pulir radios de agarre del recorte (26dp -> ~18dp) y layout del slider Enderezar en pantallas estrechas <!-- added: 2026-10-12 -->
+- [ ] Pulir radios de agarre del crop (26dp -> ~18dp) y layout del slider Enderezar en pantallas estrechas <!-- added: 2026-10-12 -->
+- [ ] Calidad del inpaint en zonas grandes (valorar OpenCV si no basta la difusion) <!-- added: 2026-10-12 -->
+- [ ] Validar en el OPPO fisico: gestos tactiles + rendimiento (pendiente WiFi adb / cable) <!-- added: 2026-10-12 -->
 
 ### In Progress
 
 ### Completed
 
 - [x] FASE 0: toolchain + esqueleto + build <!-- completed: 2026-10-12 -->
-- [x] FASE 1: nucleo + UI + export + 24/24 tests <!-- completed: 2026-10-12, b81af78 -->
-- [x] FASE 1: banco de pruebas emulador headless (KVM, API 36) + imagen sintetica de test <!-- completed: 2026-10-12 -->
-- [x] FASE 1: validacion completa en emulador (picker, exposicion +0.7EV medido, curvas UI, recorte Dibujar con log de rect, rotacion sin deformar, export 734x776 verificado en Imagenes/revela) <!-- completed: 2026-10-12, 683957a -->
-- [x] Fixes: export bounds-trap, deformacion por rotacion, recorte v2 (80% + modos Ajustar/Dibujar), pinch zoom, configChanges plegable <!-- completed: 2026-10-12 -->
+- [x] FASE 1: nucleo + UI + export + tests + validacion emulador + fixes (bounds-trap, rotacion, recorte v2, pinch, configChanges) <!-- completed: 2026-10-12 -->
+- [x] FASE 2: FramePipeline compartido (sanar->color->selectivo->vineta) + EffectiveAdjustments a core <!-- completed: 2026-10-12, 372fd00 -->
+- [x] FASE 2: Selectivo (puntos drag/chips/borrado), Vineta, Estilos (7 looks), Sanar (inpaint difusion Kotlin sin OpenCV) <!-- completed: 2026-10-12 -->
+- [x] FASE 2: 37/37 tests + validacion en emulador (vineta medida, B/N sat 0.013, punto selectivo persistido con brightness, inpaint visible) <!-- completed: 2026-10-12 -->
 
 ### Blocked
 
-- [ ] Instalacion en el OPPO fisico: bloqueada hasta reconexion USB estable o emparejamiento WiFi adb <!-- added: 2026-10-12, reason: cable flaky -->
+- [ ] Instalacion en el OPPO fisico: reconexion USB estable o emparejamiento WiFi adb <!-- added: 2026-10-12, reason: cable flaky -->
 
 ## Changelog
 
