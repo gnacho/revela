@@ -1236,6 +1236,35 @@ fun CropPanel(
                     )
                 )
             }) { Icon(Icons.Filled.RotateRight, "Rotar a la derecha", tint = Color.White) }
+            IconButton(onClick = {
+                onChange(
+                    geometry.copy(
+                        quarterTurns = geometry.quarterTurns - 1,
+                        straightenDeg = 0f,
+                        cropLeft = 0f, cropTop = 0f, cropRight = 1f, cropBottom = 1f
+                    )
+                )
+            }) { Icon(Icons.Filled.RotateLeft, "Rotar a la izquierda", tint = Color.White) }
+            IconButton(onClick = {
+                onChange(
+                    geometry.copy(
+                        quarterTurns = geometry.quarterTurns + 1,
+                        straightenDeg = 0f,
+                        cropLeft = 0f, cropTop = 0f, cropRight = 1f, cropBottom = 1f
+                    )
+                )
+            }) { Icon(Icons.Filled.RotateRight, "Rotar a la derecha", tint = Color.White) }
+            IconButton(onClick = { onChange(GeometryModel()) }) {
+                Icon(Icons.Filled.RestartAlt, "Restablecer geometria", tint = Color.White)
+            }
+            Button(onClick = onCommit) { Text("OK") }
+            Spacer(Modifier.width(6.dp))
+            OutlinedButton(onClick = onCancel) { Text("Cancelar") }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text("Enderezar", color = Color.White, fontSize = 13.sp)
             Slider(
                 value = geometry.straightenDeg,
@@ -1245,12 +1274,6 @@ fun CropPanel(
                     .weight(1f)
                     .padding(horizontal = 8.dp)
             )
-            IconButton(onClick = { onChange(GeometryModel()) }) {
-                Icon(Icons.Filled.RestartAlt, "Restablecer geometria", tint = Color.White)
-            }
-            Button(onClick = onCommit) { Text("OK") }
-            Spacer(Modifier.width(6.dp))
-            OutlinedButton(onClick = onCancel) { Text("Cancelar") }
         }
     }
 }
