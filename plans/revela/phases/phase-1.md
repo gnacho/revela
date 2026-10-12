@@ -3,7 +3,7 @@ type: planning
 entity: phase
 plan: "revela"
 phase: 1
-status: pending
+status: in_progress
 created: "2026-10-12"
 updated: "2026-10-12"
 ---
@@ -61,3 +61,8 @@ Editor global real y usable: ajustes aplicados en tiempo real sobre GPU con pila
 
 - La pila de ediciones vive en memoria + persistencia local ligera (JSON en filesDir); sin base de datos en esta fase.
 - El render final de export reutiliza el mismo pipeline de la preview (una sola implementacion de ajustes).
+- DECISION 12-Oct-2026: pipeline de color 100% CPU en Kotlin (LUTs por canal + pase de saturacion), compartido por preview (acotada a 1440 px) y export. Una sola implementacion, testeable en JVM. El paso a GPU (GLSL) se evaluara en fase 2 solo si las mascaras selectivas no llegan de CPU.
+- La geometria se renderiza en preview con transformaciones Compose exactas (formula cover para rotacion); export usa Matrix + el mismo modelo. El rectangulo inscrito del enderezado es exacto en export; en preview se cubre con zoom de cover.
+- Undo/redo cubre la pila de edits (instantaneas); la geometria se restablece con su boton propio (fuera de la pila por ahora).
+- El zoom/pan libre de la fase 0 queda aplazado a la fase 3: los gestos de la imagen ahora son de ajuste.
+- Lecciones de compilacion: detectHorizontalDragGestures entrega dragAmount como Float; BitmapFactory usa inPreferredConfig; kotlin.test con AGP 9 builtin exige dependencia explicita de kotlin-test-junit + JUnit4 (el atajo kotlin("test") no resuelve).
