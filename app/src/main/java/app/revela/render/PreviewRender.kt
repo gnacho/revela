@@ -72,8 +72,14 @@ object PreviewRender {
         edits: List<Edit> = stack.edits
     ): Bitmap = withContext(Dispatchers.Default) {
         if (identity) return@withContext base.toBitmap()
+        val t0 = android.os.SystemClock.elapsedRealtime()
         val (frame, fw, fh) = FrameMath.rotateQuarter(base.pixels, base.width, base.height, quarterTurns)
         FramePipeline.apply(frame, fw, fh, stack, edits)
-        Bitmap.createBitmap(frame, fw, fh, Bitmap.Config.ARGB_8888)
+        val bmp = Bitmap.createBitmap(frame, fw, fh, Bitmap.Config.ARGB_8888)
+        android.util.Log.i(
+            "revela",
+            "perf render=${android.os.SystemClock.elapsedRealtime() - t0}ms ${fw}x$fh"
+        )
+        bmp
     }
 }

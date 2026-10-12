@@ -38,15 +38,17 @@ object ExportProcessor {
         options: ExportOptions
     ): Result<Uri> = withContext(Dispatchers.IO) {
         runCatching {
+            val t0 = android.os.SystemClock.elapsedRealtime()
             android.util.Log.i("revela", "export: inicio")
             val resolver = context.contentResolver
 
             // 1. Decodificar fuente acotada
             android.util.Log.i("revela", "export: uri=$sourceUri")
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            val boundsStream = resolver.openInputStream(sourceUri)
+            val bytes = resolver.openInputStream(sourceUri)?.use { it.readBytes() }
                 ?: error("no se pudo abrir la imagen de origen")
-            boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
+            android.util.Log.i("revela", "export: bytes leidos=${bytes.size}")
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
                 error("no se pudieron leer las dimensiones de la imagen de origen")
             }
@@ -57,11 +59,8 @@ object ExportProcessor {
                 while (srcMax / (sample * 2) >= options.maxSide) sample *= 2
             }
             val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sample }
-            val decodeStream = resolver.openInputStream(sourceUri)
-                ?: error("no se pudo abrir la imagen de origen (2)")
-            val src = decodeStream.use {
-                BitmapFactory.decodeStream(it, null, decodeOpts)
-            } ?: error("no se pudo decodificar la imagen de origen")
+            val src = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOpts)
+                ?: error("no se pudo decodificar la imagen de origen")
 
             // 2. Geometria: rotacion total + enderezado (recorte del rectangulo inscrito) + recorte
             val rotation = Matrix().apply { postRotate(geometry.totalRotationDeg) }
@@ -96,6 +95,10 @@ object ExportProcessor {
 
             // 3. Pases de marco sobre el encuadre girado completo (mismo orden que la preview):
             //    sanar -> color global -> selectivo -> vineta
+            if (!current.isMutable) {
+                // createBitmap con matriz identidad devuelve el bitmap inmutable del decoder
+                current = current.copy(Bitmap.Config.ARGB_8888, true)
+            }
             val frameW = current.width
             val frameH = current.height
             val framePixels = IntArray(frameW * frameH)
@@ -137,6 +140,10 @@ object ExportProcessor {
             }
             val target = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
                 ?: error("MediaStore rechazo la insercion")
+            android.util.Log.i(
+                "revela",
+                "perf export=${android.os.SystemClock.elapsedRealtime() - t0}ms total"
+            )
             android.util.Log.i("revela", "export: insert ok -> $target")
             resolver.openOutputStream(target)?.use { os ->
                 temp.inputStream().use { it.copyTo(os) }

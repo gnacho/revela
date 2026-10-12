@@ -17,3 +17,6 @@ captures/
 
 # OS
 .DS_Store
+
+# Keystore config (credenciales locales, NUNCA en el repo)
+keystore.properties

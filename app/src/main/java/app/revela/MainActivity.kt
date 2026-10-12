@@ -226,7 +226,12 @@ fun EditorScreen() {
     ) { uri: Uri? ->
         if (uri != null) {
             scope.launch {
+                val t0 = android.os.SystemClock.elapsedRealtime()
                 val loaded = PreviewRender.decode(context.contentResolver, uri)
+                android.util.Log.i(
+                    "revela",
+                    "perf decode=${android.os.SystemClock.elapsedRealtime() - t0}ms ok=${loaded != null} ${loaded?.width}x${loaded?.height}"
+                )
                 base = loaded
                 originalBitmap = loaded?.toBitmap()
                 sourceUri = uri
