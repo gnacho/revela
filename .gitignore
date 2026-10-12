@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+
+# Android
+local.properties
+captures/
+*.apk.idsig
+
+# Keystores: NUNCA commitear (regla fase 3)
+*.keystore
+*.jks
+
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
