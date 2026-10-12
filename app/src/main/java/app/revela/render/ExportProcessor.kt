@@ -11,6 +11,7 @@ import android.os.Environment
 import androidx.exifinterface.media.ExifInterface
 import app.revela.core.ColorMath
 import app.revela.core.EditStack
+import app.revela.core.FramePipeline
 import app.revela.core.GeometryMath
 import app.revela.core.GeometryModel
 import kotlin.math.roundToInt
@@ -92,16 +93,20 @@ object ExportProcessor {
                 .coerceIn(0, current.width - cropW)
             val cropY = (geometry.cropTop * current.height).roundToInt()
                 .coerceIn(0, current.height - cropH)
+
+            // 3. Pases de marco sobre el encuadre girado completo (mismo orden que la preview):
+            //    sanar -> color global -> selectivo -> vineta
+            val frameW = current.width
+            val frameH = current.height
+            val framePixels = IntArray(frameW * frameH)
+            current.getPixels(framePixels, 0, frameW, 0, 0, frameW, frameH)
+            FramePipeline.apply(framePixels, frameW, frameH, stack)
+            current.setPixels(framePixels, 0, frameW, 0, 0, frameW, frameH)
+
             val cropped = Bitmap.createBitmap(current, cropX, cropY, cropW, cropH)
             if (cropped != current) current.recycle()
 
-            // 3. Color con el mismo pipeline que la preview
-            val adjustments = EffectiveAdjustments.from(stack)
-            val pixels = IntArray(cropped.width * cropped.height)
-            cropped.getPixels(pixels, 0, cropped.width, 0, 0, cropped.width, cropped.height)
-            cropped.recycle()
-            ColorMath.applyInPlace(pixels, ColorMath.buildLuts(adjustments), adjustments.saturation)
-            val out = Bitmap.createBitmap(pixels, cropped.width, cropped.height, Bitmap.Config.ARGB_8888)
+            // 4. Guardar: fichero temporal -> EXIF -> MediaStore
 
             // 4. Guardar: fichero temporal -> EXIF -> MediaStore
             android.util.Log.i(
@@ -114,12 +119,12 @@ object ExportProcessor {
             val temp = java.io.File(context.cacheDir, "revela_export_$stamp.$ext")
             temp.outputStream().use { fos ->
                 if (options.png) {
-                    out.compress(Bitmap.CompressFormat.PNG, 100, fos)
+                    cropped.compress(Bitmap.CompressFormat.PNG, 100, fos)
                 } else {
-                    out.compress(Bitmap.CompressFormat.JPEG, options.quality.coerceIn(60, 100), fos)
+                    cropped.compress(Bitmap.CompressFormat.JPEG, options.quality.coerceIn(60, 100), fos)
                 }
             }
-            out.recycle()
+            cropped.recycle()
 
             copyExif(resolver, sourceUri, temp)
 

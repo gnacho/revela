@@ -12,7 +12,22 @@ object Tool {
     const val WHITE_BALANCE = "whiteBalance"
     const val CURVES = "curves"
     const val CROP = "crop"
+    const val SELECTIVE = "selective"
+    const val VIGNETTE = "vignette"
+    const val HEAL = "heal"
+    const val LOOK = "look"
 }
+
+/** Punto de control selectivo (coordenadas normalizadas al marco). */
+@Serializable
+data class ControlPoint(
+    val x: Float,
+    val y: Float,
+    val brightness: Float = 0f,   // -1..1
+    val contrast: Float = 0f,     // -1..1
+    val saturation: Float = 0f,   // -1..1
+    val radius: Float = 0.25f     // fraccion del lado menor del marco
+)
 
 @Serializable
 sealed interface Edit {
@@ -46,6 +61,30 @@ sealed interface Edit {
     @SerialName("curves")
     data class Curves(val points: List<CurvePoint> = listOf(CurvePoint(0f, 0f), CurvePoint(1f, 1f))) : Edit {
         override val toolId: String get() = Tool.CURVES
+    }
+
+    @Serializable
+    @SerialName("selective")
+    data class Selective(val points: List<ControlPoint> = emptyList()) : Edit {
+        override val toolId: String get() = Tool.SELECTIVE
+    }
+
+    @Serializable
+    @SerialName("vignette")
+    data class Vignette(val strength: Float = 0f) : Edit {
+        override val toolId: String get() = Tool.VIGNETTE
+    }
+
+    @Serializable
+    @SerialName("heal")
+    data class Heal(val strokes: List<HealStroke> = emptyList()) : Edit {
+        override val toolId: String get() = Tool.HEAL
+    }
+
+    @Serializable
+    @SerialName("look")
+    data class Look(val id: String = "none") : Edit {
+        override val toolId: String get() = Tool.LOOK
     }
 }
 
@@ -97,6 +136,53 @@ class EditStack(initialEdits: List<Edit> = emptyList()) {
         pushUndo()
         current = edits.toList()
     }
+
+    /** Anade un punto de control selectivo (fusiona en el edit Selective existente). */
+    fun applySelectivePoint(point: ControlPoint) {
+        pushUndo()
+        val existing = current.filterIsInstance<Edit.Selective>().firstOrNull()
+        val points = existing?.points.orEmpty() + point
+        current = current.filterNot { it.toolId == Tool.SELECTIVE } + Edit.Selective(points)
+    }
+
+    /** Sustituye el punto de la posicion index. */
+    fun updateSelectivePoint(index: Int, point: ControlPoint) {
+        pushUndo()
+        current = current.map { edit ->
+            if (edit is Edit.Selective) {
+                Edit.Selective(edit.points.toMutableList().apply { set(index.coerceIn(0, size - 1), point) })
+            } else {
+                edit
+            }
+        }
+    }
+
+    /** Elimina el punto de la posicion index. */
+    fun removeSelectivePoint(index: Int) {
+        pushUndo()
+        current = current.mapNotNull { edit ->
+            if (edit is Edit.Selective) {
+                val pts = edit.points.toMutableList().apply { removeAt(index.coerceIn(0, size - 1)) }
+                if (pts.isEmpty()) null else Edit.Selective(pts)
+            } else {
+                edit
+            }
+        }
+    }
+
+    /** Anade un trazo de sanado (fusiona en el edit Heal existente). */
+    fun applyHealStroke(stroke: HealStroke) {
+        pushUndo()
+        val existing = current.filterIsInstance<Edit.Heal>().firstOrNull()
+        val strokes = existing?.strokes.orEmpty() + stroke
+        current = current.filterNot { it.toolId == Tool.HEAL } + Edit.Heal(strokes)
+    }
+
+    fun selectivePoints(): List<ControlPoint> =
+        current.filterIsInstance<Edit.Selective>().firstOrNull()?.points.orEmpty()
+
+    fun healStrokes(): List<HealStroke> =
+        current.filterIsInstance<Edit.Heal>().firstOrNull()?.strokes.orEmpty()
 
     fun toState(): EditState = EditState(current)
 

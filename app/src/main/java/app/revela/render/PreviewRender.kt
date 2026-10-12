@@ -4,7 +4,10 @@ import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import app.revela.core.ColorMath
+import app.revela.core.Edit
+import app.revela.core.EditStack
+import app.revela.core.FrameMath
+import app.revela.core.FramePipeline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -60,12 +63,17 @@ object PreviewRender {
         BaseImage(pixels, w, h)
     }
 
-    /** Renderiza la preview con los ajustes indicados (o la original si identity). */
-    suspend fun render(base: BaseImage, adjustments: ColorMath.Adjustments, identity: Boolean): Bitmap =
-        withContext(Dispatchers.Default) {
-            if (identity) return@withContext base.toBitmap()
-            val pixels = base.clonePixels()
-            ColorMath.applyInPlace(pixels, ColorMath.buildLuts(adjustments), adjustments.saturation)
-            Bitmap.createBitmap(pixels, base.width, base.height, Bitmap.Config.ARGB_8888)
-        }
+    /** Renderiza el marco con TODA la pila (sanar->color->selectivo->vineta) o la original. */
+    suspend fun render(
+        base: BaseImage,
+        stack: EditStack,
+        quarterTurns: Int,
+        identity: Boolean,
+        edits: List<Edit> = stack.edits
+    ): Bitmap = withContext(Dispatchers.Default) {
+        if (identity) return@withContext base.toBitmap()
+        val (frame, fw, fh) = FrameMath.rotateQuarter(base.pixels, base.width, base.height, quarterTurns)
+        FramePipeline.apply(frame, fw, fh, stack, edits)
+        Bitmap.createBitmap(frame, fw, fh, Bitmap.Config.ARGB_8888)
+    }
 }

@@ -1,11 +1,8 @@
-package app.revela.render
+package app.revela.core
 
-import app.revela.core.ColorMath
-import app.revela.core.CurvePoint
-import app.revela.core.Edit
-import app.revela.core.EditStack
+import app.revela.core.Look
 
-/** Plega la pila de edits en ajustes efectivos (la ultima entrada de cada herramienta gana). */
+/** Plega la pila de edits en ajustes globales efectivos (la ultima entrada de cada herramienta gana). */
 object EffectiveAdjustments {
 
     fun from(stack: EditStack): ColorMath.Adjustments {
@@ -17,6 +14,17 @@ object EffectiveAdjustments {
                 is Edit.Saturation -> a.copy(saturation = edit.amount)
                 is Edit.WhiteBalance -> a.copy(temperature = edit.temperature, tint = edit.tint)
                 is Edit.Curves -> a.copy(curve = edit.points)
+                is Edit.Look -> {
+                    val look = Look.byId(edit.id)
+                    a.copy(
+                        exposureStops = (a.exposureStops + look.dExposure).coerceIn(-2f, 2f),
+                        contrast = (a.contrast + look.dContrast).coerceIn(-1f, 1f),
+                        saturation = (a.saturation + look.dSaturation).coerceIn(-1f, 1f),
+                        temperature = (a.temperature + look.dTemperature).coerceIn(-1f, 1f)
+                    )
+                }
+                // sanar/selectivo/vineta son pases de marco, no ajustes globales
+                is Edit.Heal, is Edit.Selective, is Edit.Vignette -> a
             }
         }
         return a
@@ -26,31 +34,31 @@ object EffectiveAdjustments {
     fun withWorking(base: ColorMath.Adjustments, toolId: String, working: ColorMath.Adjustments?): ColorMath.Adjustments {
         if (working == null) return base
         return when (toolId) {
-            app.revela.core.Tool.EXPOSURE -> base.copy(exposureStops = working.exposureStops)
-            app.revela.core.Tool.CONTRAST -> base.copy(contrast = working.contrast)
-            app.revela.core.Tool.SATURATION -> base.copy(saturation = working.saturation)
-            app.revela.core.Tool.WHITE_BALANCE -> base.copy(temperature = working.temperature, tint = working.tint)
-            app.revela.core.Tool.CURVES -> base.copy(curve = working.curve)
+            Tool.EXPOSURE -> base.copy(exposureStops = working.exposureStops)
+            Tool.CONTRAST -> base.copy(contrast = working.contrast)
+            Tool.SATURATION -> base.copy(saturation = working.saturation)
+            Tool.WHITE_BALANCE -> base.copy(temperature = working.temperature, tint = working.tint)
+            Tool.CURVES -> base.copy(curve = working.curve)
             else -> base
         }
     }
 
     /** Valor actual del parametro de la herramienta para inicializar el gesto. */
     fun valueOf(a: ColorMath.Adjustments, toolId: String, wbParam: WbParam): Float = when (toolId) {
-        app.revela.core.Tool.EXPOSURE -> a.exposureStops
-        app.revela.core.Tool.CONTRAST -> a.contrast
-        app.revela.core.Tool.SATURATION -> a.saturation
-        app.revela.core.Tool.WHITE_BALANCE -> if (wbParam == WbParam.TEMPERATURE) a.temperature else a.tint
+        Tool.EXPOSURE -> a.exposureStops
+        Tool.CONTRAST -> a.contrast
+        Tool.SATURATION -> a.saturation
+        Tool.WHITE_BALANCE -> if (wbParam == WbParam.TEMPERATURE) a.temperature else a.tint
         else -> 0f
     }
 
     /** Construye el edit correspondiente a una herramienta con el valor final del gesto. */
     fun buildEdit(toolId: String, base: ColorMath.Adjustments, wbParam: WbParam, value: Float): Edit? =
         when (toolId) {
-            app.revela.core.Tool.EXPOSURE -> Edit.Exposure(value)
-            app.revela.core.Tool.CONTRAST -> Edit.Contrast(value)
-            app.revela.core.Tool.SATURATION -> Edit.Saturation(value)
-            app.revela.core.Tool.WHITE_BALANCE ->
+            Tool.EXPOSURE -> Edit.Exposure(value)
+            Tool.CONTRAST -> Edit.Contrast(value)
+            Tool.SATURATION -> Edit.Saturation(value)
+            Tool.WHITE_BALANCE ->
                 if (wbParam == WbParam.TEMPERATURE) {
                     Edit.WhiteBalance(temperature = value, tint = base.tint)
                 } else {
@@ -60,12 +68,12 @@ object EffectiveAdjustments {
         }
 
     fun rangeFor(toolId: String): ClosedFloatingPointRange<Float> = when (toolId) {
-        app.revela.core.Tool.EXPOSURE -> -2f..2f
+        Tool.EXPOSURE -> -2f..2f
         else -> -1f..1f
     }
 
     fun formatValue(toolId: String, wbParam: WbParam, value: Float): String = when (toolId) {
-        app.revela.core.Tool.EXPOSURE -> {
+        Tool.EXPOSURE -> {
             val stops = (value * 10).toInt() / 10f
             (if (stops > 0) "+" else "") + "$stops EV"
         }

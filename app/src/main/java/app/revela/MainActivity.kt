@@ -17,7 +17,6 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -29,11 +28,14 @@ import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
@@ -60,6 +62,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -82,22 +85,24 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.revela.core.ControlPoint
 import app.revela.core.CurvePoint
 import app.revela.core.Edit
 import app.revela.core.EditStack
+import app.revela.core.FrameMath
 import app.revela.core.GeometryModel
+import app.revela.core.Look
 import app.revela.core.Tool
 import app.revela.render.BaseImage
-import app.revela.render.EffectiveAdjustments
+import app.revela.core.EffectiveAdjustments
 import app.revela.render.ExportOptions
 import app.revela.render.ExportProcessor
 import app.revela.render.PreviewRender
 import app.revela.render.SessionStore
-import app.revela.render.WbParam
+import app.revela.core.WbParam
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
@@ -113,7 +118,15 @@ enum class EditorTool(val id: String, val label: String) {
     SATURATION(Tool.SATURATION, "Saturacion"),
     WHITE_BALANCE(Tool.WHITE_BALANCE, "Temperatura"),
     CURVES(Tool.CURVES, "Curvas"),
+    SELECTIVE(Tool.SELECTIVE, "Selectivo"),
+    VIGNETTE(Tool.VIGNETTE, "Vineta"),
+    LOOKS(Tool.LOOK, "Estilos"),
+    HEAL(Tool.HEAL, "Sanar"),
     CROP(Tool.CROP, "Recortar")
+}
+
+enum class SelParam(val label: String) {
+    BRIGHTNESS("Brillo"), CONTRAST("Contraste"), SATURATION("Saturacion")
 }
 
 class MainActivity : ComponentActivity() {
@@ -153,11 +166,18 @@ fun EditorScreen() {
     var viewScale by remember { mutableFloatStateOf(1f) }
     var viewOffset by remember { mutableStateOf(Offset.Zero) }
 
-    // Al abrir una herramienta se resetea el zoom de inspeccion
-    LaunchedEffect(activeTool, sourceUri) {
-        viewScale = 1f
-        viewOffset = Offset.Zero
-    }
+    // Selectivo
+    var selParam by remember { mutableStateOf(SelParam.BRIGHTNESS) }
+    var activePoint by remember { mutableIntStateOf(-1) }
+    var workingPoint by remember { mutableStateOf<ControlPoint?>(null) }
+
+    // Vineta
+    var workingVignette by remember { mutableFloatStateOf(Float.NaN) }
+
+    // Sanar
+    var brushSize by remember { mutableFloatStateOf(0.05f) }
+    val strokeX = remember { mutableStateListOf<Float>() }
+    val strokeY = remember { mutableStateListOf<Float>() }
 
     val cropWorking = if (activeTool == EditorTool.CROP) (workingGeometry ?: geometry) else null
 
@@ -185,47 +205,53 @@ fun EditorScreen() {
         persistSession()
     }
 
+    /** Lista de edits efectiva (incluye el estado de trabajo del selectivo y la vineta). */
+    fun effectiveEdits(): List<Edit> {
+        var list = stack.edits
+        if (activeTool == EditorTool.SELECTIVE && workingPoint != null) {
+            val pts = stack.selectivePoints().toMutableList()
+            if (activePoint in pts.indices) {
+                pts[activePoint] = workingPoint!!
+                list = list.map { if (it is Edit.Selective) it.copy(points = pts) else it }
+            }
+        }
+        if (activeTool == EditorTool.VIGNETTE && !workingVignette.isNaN()) {
+            list = list.filterNot { it is Edit.Vignette } + Edit.Vignette(workingVignette)
+        }
+        return list
+    }
+
     val pickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
-        android.util.Log.i("revela", "picker result uri=$uri")
         if (uri != null) {
             scope.launch {
-                runCatching {
-                    val loaded = PreviewRender.decode(context.contentResolver, uri)
-                    android.util.Log.i(
-                        "revela",
-                        "decode ok=${loaded != null} ${loaded?.width}x${loaded?.height}"
-                    )
-                    base = loaded
-                    originalBitmap = loaded?.toBitmap()
-                    sourceUri = uri
-                    activeTool = null
-                    workingAdj = null
-                    workingGeometry = null
-                    val restored = loaded?.let { SessionStore.load(context, uri) }
-                    stack = restored?.first ?: EditStack()
-                    geometry = restored?.second ?: GeometryModel()
-                    stackVersion++
-                }.onFailure {
-                    android.util.Log.e("revela", "error al abrir imagen", it)
-                    Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_LONG).show()
-                }
+                val loaded = PreviewRender.decode(context.contentResolver, uri)
+                base = loaded
+                originalBitmap = loaded?.toBitmap()
+                sourceUri = uri
+                activeTool = null
+                workingAdj = null
+                workingGeometry = null
+                workingPoint = null
+                activePoint = -1
+                strokeX.clear()
+                strokeY.clear()
+                val restored = loaded?.let { SessionStore.load(context, uri) }
+                stack = restored?.first ?: EditStack()
+                geometry = restored?.second ?: GeometryModel()
+                stackVersion++
             }
         }
     }
 
-    LaunchedEffect(base, stackVersion, workingAdj, activeTool, showOriginal, wbParam) {
+    LaunchedEffect(base, stackVersion, workingAdj, workingPoint, workingVignette, activeTool, showOriginal, wbParam) {
         val b = base ?: return@LaunchedEffect
         renderJob?.cancel()
-        val snapshotTool = activeTool
-        val adj = EffectiveAdjustments.withWorking(
-            EffectiveAdjustments.from(stack),
-            snapshotTool?.id ?: "",
-            workingAdj
-        )
+        val snapshotEdits = effectiveEdits()
+        val quarter = geometry.quarterTurns
         renderJob = scope.launch(Dispatchers.Default) {
-            val bmp = PreviewRender.render(b, adj, showOriginal)
+            val bmp = PreviewRender.render(b, stack, quarter, showOriginal, snapshotEdits)
             preview = bmp
         }
     }
@@ -296,33 +322,65 @@ fun EditorScreen() {
                     activeTool = null
                     workingAdj = null
                     workingGeometry = null
+                    workingPoint = null
+                    activePoint = -1
                     dragValue = Float.NaN
+                    workingVignette = Float.NaN
+                    strokeX.clear()
+                    strokeY.clear()
                 }) { Icon(Icons.Filled.Close, "Cerrar herramienta", tint = Color.White) }
-                Spacer(Modifier.weight(1f))
                 IconButton(onClick = {
-                    if (activeTool == EditorTool.CROP) {
-                        workingGeometry?.let {
-                            geometry = it
-                            persistSession()
+                    when (activeTool) {
+                        EditorTool.CROP -> {
+                            workingGeometry?.let {
+                                geometry = it
+                                persistSession()
+                            }
                         }
+                        EditorTool.SELECTIVE -> {
+                            val wp = workingPoint
+                            if (wp != null && activePoint >= 0) {
+                                stack.updateSelectivePoint(activePoint, wp)
+                                stackVersion++
+                                persistSession()
+                            }
+                        }
+                        else -> {}
                     }
-                    activeTool = null
                     workingAdj = null
                     workingGeometry = null
+                    workingPoint = null
+                    activePoint = -1
+                    activeTool = null
                 }) { Icon(Icons.Filled.Check, "Listo", tint = Color.White) }
             }
         }
-
         // Valor en curso durante el gesto
         val toolForValue = activeTool
-        if (toolForValue != null && toolForValue != EditorTool.CROP && toolForValue != EditorTool.CURVES) {
+        if (toolForValue != null && showValueChip(toolForValue)) {
             val shown = if (dragValue.isNaN()) {
-                EffectiveAdjustments.valueOf(effective(), toolForValue.id, wbParam)
+                when (toolForValue) {
+                    EditorTool.SELECTIVE -> {
+                        val pts = stack.selectivePoints()
+                        val wp = workingPoint
+                        val p = if (wp != null && activePoint in pts.indices) wp
+                        else pts.getOrNull(activePoint)
+                        when (selParam) {
+                            SelParam.BRIGHTNESS -> p?.brightness ?: 0f
+                            SelParam.CONTRAST -> p?.contrast ?: 0f
+                            SelParam.SATURATION -> p?.saturation ?: 0f
+                        }
+                    }
+                    EditorTool.VIGNETTE -> if (workingVignette.isNaN()) {
+                        (stack.edits.filterIsInstance<Edit.Vignette>().firstOrNull()?.strength ?: 0f)
+                    } else workingVignette
+                    else -> EffectiveAdjustments.valueOf(effective(), toolForValue.id, wbParam)
+                }
             } else {
                 dragValue
             }
             Text(
-                text = EffectiveAdjustments.formatValue(toolForValue.id, wbParam, shown),
+                text = formatChipValue(toolForValue, shown),
                 color = Color.White,
                 fontSize = 22.sp,
                 textAlign = TextAlign.Center,
@@ -376,12 +434,10 @@ fun EditorScreen() {
                 val frameHdp = with(density) { frameH.toDp() }
                 val boxWdp = with(density) { w.toDp() }
                 val boxHdp = with(density) { h.toDp() }
-                // El elemento imagen se dimensiona SIN girar; tras rotationZ ocupa el marco exacto
                 val oddTurnsImg = ((g.quarterTurns % 4) + 4) % 4 % 2 == 1
                 val imgWdp = if (oddTurnsImg) frameHdp else frameWdp
                 val imgHdp = if (oddTurnsImg) frameWdp else frameHdp
 
-                // Zoom de inspeccion con dos dedos (solo sin herramienta activa)
                 val toolNow = activeTool
                 Box(
                     modifier = Modifier
@@ -392,6 +448,11 @@ fun EditorScreen() {
                             scaleY = viewScale
                             translationX = viewOffset.x
                             translationY = viewOffset.y
+                        }
+                        .pointerInput("debugtap") {
+                            detectTapGestures { pos ->
+                                android.util.Log.d("revela", "TAP VIEWPORT en $pos tool=$toolNow")
+                            }
                         }
                         .let { mod ->
                             if (toolNow == null) {
@@ -426,45 +487,184 @@ fun EditorScreen() {
                         )
                     }
 
-                    // Gestos de ajuste (herramientas de color)
-                    val tool = activeTool
-                    if (tool != null && tool != EditorTool.CROP && tool != EditorTool.CURVES) {
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .pointerInput(tool.id, wbParam) {
-                                    val range = EffectiveAdjustments.rangeFor(tool.id)
-                                    var start = 0f
-                                    detectHorizontalDragGestures(
-                                        onDragStart = {
-                                            start = EffectiveAdjustments.valueOf(
-                                                effective(), tool.id, wbParam
-                                            )
-                                        },
-                                        onDragEnd = {
-                                            if (!dragValue.isNaN()) commitToolValue(dragValue)
-                                        },
-                                        onDragCancel = { dragValue = Float.NaN }
-                                    ) { change, dragAmount ->
-                                        change.consume()
-                                        val span = range.endInclusive - range.start
-                                        if (dragValue.isNaN()) dragValue = start
-                                        dragValue = (dragValue + dragAmount / (viewportWpx * 1.8f) * span)
-                                            .coerceIn(range.start, range.endInclusive)
-                                        workingAdj = makeWorking(tool.id, wbParam, dragValue)
+                    // Gestos por herramienta
+                    when (toolNow) {
+                        EditorTool.SELECTIVE -> {
+                            val ptsNow = stack.selectivePoints()
+                            val ptsNowRef = rememberUpdatedState(ptsNow)
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .pointerInput(g, ptsNow.size, activePoint) {
+                                        detectTapGestures(
+                                            onTap = { pos ->
+                                                val fx = g.cropLeft + pos.x / viewportWpx * g.cropWidthNorm
+                                                val fy = g.cropTop + pos.y / viewportHpx * g.cropHeightNorm
+                                                val pts = ptsNowRef.value
+                                                val near = pts.indexOfFirst {
+                                                    abs(it.x - fx) < 0.04f && abs(it.y - fy) < 0.06f
+                                                }
+                                                if (near >= 0) {
+                                                    activePoint = near
+                                                } else if (pts.size < 8) {
+                                                    stack.applySelectivePoint(ControlPoint(fx, fy))
+                                                    activePoint = stack.selectivePoints().lastIndex
+                                                    stackVersion++
+                                                    persistSession()
+                                                }
+                                            },
+                                            onLongPress = { pos ->
+                                                val fx = g.cropLeft + pos.x / viewportWpx * g.cropWidthNorm
+                                                val fy = g.cropTop + pos.y / viewportHpx * g.cropHeightNorm
+                                                val pts = ptsNowRef.value
+                                                val near = pts.indexOfFirst {
+                                                    abs(it.x - fx) < 0.05f && abs(it.y - fy) < 0.07f
+                                                }
+                                                if (near >= 0) {
+                                                    stack.removeSelectivePoint(near)
+                                                    activePoint = -1
+                                                    workingPoint = null
+                                                    stackVersion++
+                                                    persistSession()
+                                                }
+                                            }
+                                        )
                                     }
-                                }
-                        )
-                    }
+                                    .pointerInput(selParam, activePoint) {
+                                        val span = 2f
+                                        var start = 0f
+                                        var moveMode = false
+                                        detectDragGestures(
+                                            onDragStart = { pos ->
+                                                val fx = g.cropLeft + pos.x / viewportWpx * g.cropWidthNorm
+                                                val fy = g.cropTop + pos.y / viewportHpx * g.cropHeightNorm
+                                                val pts = ptsNowRef.value
+                                                val near = pts.indexOfFirst {
+                                                    abs(it.x - fx) < 0.05f && abs(it.y - fy) < 0.08f
+                                                }
+                                                moveMode = near >= 0
+                                                if (moveMode) {
+                                                    activePoint = near
+                                                } else if (activePoint in pts.indices) {
+                                                    val p = pts[activePoint]
+                                                    start = when (selParam) {
+                                                        SelParam.BRIGHTNESS -> p.brightness
+                                                        SelParam.CONTRAST -> p.contrast
+                                                        SelParam.SATURATION -> p.saturation
+                                                    }
+                                                    workingPoint = p
+                                                }
+                                            },
+                                            onDrag = { change, amount ->
+                                                change.consume()
+                                                if (moveMode) {
+                                                    val p = workingPoint ?: return@detectDragGestures
+                                                    workingPoint = p.copy(
+                                                        x = (p.x + amount.x / viewportWpx * g.cropWidthNorm)
+                                                            .coerceIn(0f, 1f),
+                                                        y = (p.y + amount.y / viewportHpx * g.cropHeightNorm)
+                                                            .coerceIn(0f, 1f)
+                                                    )
+                                                } else if (activePoint in stack.selectivePoints().indices) {
+                                                    if (dragValue.isNaN()) dragValue = start
+                                                    dragValue = (dragValue + amount.x / viewportWpx * span)
+                                                        .coerceIn(-1f, 1f)
+                                                    val p = stack.selectivePoints()[activePoint]
+                                                    workingPoint = when (selParam) {
+                                                        SelParam.BRIGHTNESS -> p.copy(brightness = dragValue)
+                                                        SelParam.CONTRAST -> p.copy(contrast = dragValue)
+                                                        SelParam.SATURATION -> p.copy(saturation = dragValue)
+                                                    }
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                val wp = workingPoint
+                                                if (wp != null && activePoint >= 0) {
+                                                    stack.updateSelectivePoint(activePoint, wp)
+                                                    stackVersion++
+                                                    persistSession()
+                                                }
+                                                workingPoint = null
+                                                dragValue = Float.NaN
+                                            },
+                                            onDragCancel = {
+                                                workingPoint = null
+                                                dragValue = Float.NaN
+                                            }
+                                        )
+                                    }
+                            )
 
-                    if (inCrop && cropWorking != null) {
-                        CropOverlay(
-                            modifier = Modifier.matchParentSize(),
-                            geometry = cropWorking,
-                            frameAspect = frameAspect,
-                            drawMode = cropDrawMode,
-                            onGeometry = { workingGeometry = it }
-                        )
+                            Canvas(modifier = Modifier.matchParentSize()) {
+                                fun drawPt(cx: Float, cy: Float, active: Boolean) {
+                                    drawCircle(
+                                        if (active) Color(0xFF7AA2FF) else Color.White,
+                                        radius = if (active) 16f else 10f,
+                                        center = Offset(cx, cy)
+                                    )
+                                    drawCircle(
+                                        Color.Black.copy(alpha = 0.6f),
+                                        radius = if (active) 7f else 4f,
+                                        center = Offset(cx, cy)
+                                    )
+                                }
+                                ptsNow.forEachIndexed { idx, p ->
+                                    val cx = ((p.x - g.cropLeft) / g.cropWidthNorm) * size.width
+                                    val cy = ((p.y - g.cropTop) / g.cropHeightNorm) * size.height
+                                    drawPt(cx, cy, idx == activePoint)
+                                }
+                                val wpNow = workingPoint
+                                if (wpNow != null) {
+                                    val cx = ((wpNow.x - g.cropLeft) / g.cropWidthNorm) * size.width
+                                    val cy = ((wpNow.y - g.cropTop) / g.cropHeightNorm) * size.height
+                                    drawPt(cx, cy, true)
+                                }
+                            }
+                        }
+
+                        EditorTool.HEAL -> {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragStart = { pos ->
+                                                strokeX.add(pos.x / viewportWpx)
+                                                strokeY.add(pos.y / viewportHpx)
+                                            },
+                                            onDrag = { change, _ ->
+                                                change.consume()
+                                                strokeX.add(change.position.x / viewportWpx)
+                                                strokeY.add(change.position.y / viewportHpx)
+                                            }
+                                        )
+                                    }
+                            )
+                            Canvas(modifier = Modifier.matchParentSize()) {
+                                val r = brushSize * size.minDimension
+                                for (i in strokeX.indices) {
+                                    drawCircle(
+                                        Color.White.copy(alpha = 0.45f),
+                                        radius = r,
+                                        center = Offset(strokeX[i] * size.width, strokeY[i] * size.height)
+                                    )
+                                }
+                            }
+                        }
+
+                        EditorTool.CROP -> {
+                            if (inCrop && cropWorking != null) {
+                                CropOverlay(
+                                    modifier = Modifier.matchParentSize(),
+                                    geometry = cropWorking,
+                                    frameAspect = frameAspect,
+                                    drawMode = cropDrawMode,
+                                    onGeometry = { workingGeometry = it }
+                                )
+                            }
+                        }
+
+                        else -> {}
                     }
                 }
             }
@@ -501,12 +701,148 @@ fun EditorScreen() {
                 }
             )
 
+            EditorTool.SELECTIVE -> Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF101014))
+                    .navigationBarsPadding()
+                    .padding(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    SelParam.entries.forEach { p ->
+                        FilterChip(
+                            selected = selParam == p,
+                            onClick = {
+                                selParam = p
+                                dragValue = Float.NaN
+                            },
+                            label = { Text(p.label, fontSize = 12.sp) },
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    }
+                }
+                Text(
+                    "Toca para anadir punto (max 8) - arrastra el punto para moverlo - pulsacion larga para borrar - desliza en horizontal para ajustar",
+                    color = Color.Gray,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            EditorTool.VIGNETTE -> Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF101014))
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                val currentV = if (workingVignette.isNaN()) {
+                    stack.edits.filterIsInstance<Edit.Vignette>().firstOrNull()?.strength ?: 0f
+                } else workingVignette
+                Text(
+                    "Intensidad: ${(currentV * 100).toInt()}%",
+                    color = Color.White,
+                    fontSize = 13.sp
+                )
+                Slider(
+                    value = currentV,
+                    onValueChange = { workingVignette = it },
+                    valueRange = 0f..1f
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(onClick = {
+                        workingVignette = 0f
+                        stack.removeTool(Tool.VIGNETTE)
+                        stackVersion++
+                        workingVignette = Float.NaN
+                        persistSession()
+                    }) { Text("Quitar") }
+                    Button(onClick = {
+                        val v = if (workingVignette.isNaN()) currentV else workingVignette
+                        stack.apply(Edit.Vignette(v))
+                        stackVersion++
+                        workingVignette = Float.NaN
+                        persistSession()
+                        activeTool = null
+                    }) { Text("Aplicar") }
+                }
+            }
+
+            EditorTool.LOOKS -> Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .background(Color(0xFF101014))
+                    .navigationBarsPadding()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Look.entries.forEach { look ->
+                    FilterChip(
+                        selected = stack.edits.filterIsInstance<Edit.Look>()
+                            .firstOrNull()?.id == look.id,
+                        onClick = {
+                            stack.apply(Edit.Look(look.id))
+                            stackVersion++
+                            persistSession()
+                        },
+                        label = { Text(look.label, fontSize = 12.sp) }
+                    )
+                }
+            }
+
+            EditorTool.HEAL -> Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF101014))
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    "Brocha: ${(brushSize * 100).toInt()}%",
+                    color = Color.White,
+                    fontSize = 13.sp
+                )
+                Slider(
+                    value = brushSize,
+                    onValueChange = { brushSize = it },
+                    valueRange = 0.02f..0.12f
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = {
+                            if (strokeX.isNotEmpty()) {
+                                stack.applyHealStroke(
+                                    app.revela.core.HealStroke(
+                                        radiusNorm = brushSize,
+                                        xs = strokeX.toList(),
+                                        ys = strokeY.toList()
+                                    )
+                                )
+                                stackVersion++
+                                strokeX.clear()
+                                strokeY.clear()
+                                persistSession()
+                            }
+                        },
+                        enabled = strokeX.isNotEmpty()
+                    ) { Text("Sanar zona") }
+                    OutlinedButton(onClick = {
+                        strokeX.clear()
+                        strokeY.clear()
+                    }) { Text("Descartar trazo") }
+                }
+            }
+
             EditorTool.CROP -> {
                 val g0 = cropWorking ?: geometry
                 val baseAspect0 = base?.let { it.width.toFloat() / it.height.toFloat() } ?: 1f
                 val odd0 = ((g0.quarterTurns % 4) + 4) % 4 % 2 == 1
                 val frameAspect0 = if (odd0) 1f / baseAspect0 else baseAspect0
-                // Caja inicial: 80% centrada (si la actual ocupa todo el marco)
                 LaunchedEffect(sourceUri, activeTool) {
                     if (activeTool == EditorTool.CROP && workingGeometry == null &&
                         g0.cropLeft <= 0f && g0.cropTop <= 0f &&
@@ -524,7 +860,6 @@ fun EditorScreen() {
                     onDrawModeChange = { cropDrawMode = it },
                     onChange = { workingGeometry = it },
                     onCommit = {
-                        android.util.Log.d("revela", "crop commit working=$workingGeometry")
                         workingGeometry?.let {
                             geometry = it
                             persistSession()
@@ -538,11 +873,13 @@ fun EditorScreen() {
                     }
                 )
             }
+
             EditorTool.WHITE_BALANCE -> Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(Color(0xFF101014))
                     .navigationBarsPadding()
-                    .padding(bottom = 8.dp)
+                    .padding(vertical = 8.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -606,6 +943,23 @@ fun EditorScreen() {
     }
 }
 
+private fun showValueChip(tool: EditorTool): Boolean = when (tool) {
+    EditorTool.CROP, EditorTool.CURVES, EditorTool.LOOKS, EditorTool.HEAL -> false
+    else -> true
+}
+
+private fun formatChipValue(tool: EditorTool, value: Float): String = when (tool) {
+    EditorTool.EXPOSURE -> {
+        val stops = (value * 10).toInt() / 10f
+        (if (stops > 0) "+" else "") + "$stops EV"
+    }
+    EditorTool.VIGNETTE -> "${(value * 100).toInt()}%"
+    else -> {
+        val pct = (value * 100).toInt()
+        (if (pct > 0) "+" else "") + "$pct"
+    }
+}
+
 private fun makeWorking(
     toolId: String,
     wbParam: WbParam,
@@ -661,7 +1015,6 @@ fun CurvesPanel(
     var points by remember { mutableStateOf(current) }
     val currentRef = rememberUpdatedState(current)
 
-    // Si la fuente cambia (commit/reset), sincroniza
     LaunchedEffect(currentRef.value) {
         points = currentRef.value
     }
@@ -829,8 +1182,10 @@ fun CropPanel(
             )
         }
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
         ) {
             listOf(
                 "Libre" to null,
@@ -900,7 +1255,6 @@ fun CropPanel(
     }
 }
 
-/** Rect maximo con la relacion de aspecto pedida (en pixeles del marco), centrado en el foco actual. */
 private fun centeredRatioRect(
     g: GeometryModel,
     ratio: Float,
@@ -908,7 +1262,7 @@ private fun centeredRatioRect(
 ): GeometryModel {
     val cx = (g.cropLeft + g.cropRight) / 2f
     val cy = (g.cropTop + g.cropBottom) / 2f
-    val target = ratio / frameAspect // w_norm / h_norm
+    val target = ratio / frameAspect
     var w: Float
     var h: Float
     if (target >= 1f) {
@@ -945,7 +1299,7 @@ fun CropOverlay(
     var mode by remember { mutableStateOf(CropMode.NONE) }
     var moveOffset by remember { mutableStateOf(Offset.Zero) }
     var drawStart by remember { mutableStateOf(Offset.Zero) }
-    val handlePx = with(LocalDensity.current) { 26.dp.toPx() }
+    val handlePx = with(LocalDensity.current) { 18.dp.toPx() }
 
     Box(
         modifier = modifier
@@ -982,17 +1336,13 @@ fun CropOverlay(
                                 }
                             }
                         }
-                        android.util.Log.d(
-                            "revela",
-                            "crop start pos=$pos mode=$mode handle=$handle viewport=$viewport geom=${geometryRef.value}"
-                        )
                     },
                     onDrag = { change, _ ->
                         change.consume()
                         val g = geometryRef.value
                         val w = viewport.width.toFloat()
                         val h = viewport.height.toFloat()
-                        val minSize = 0.1f
+                        val minSize = 0.08f
                         when (mode) {
                             CropMode.RESIZE -> {
                                 val dx = change.position.x / w
@@ -1024,7 +1374,6 @@ fun CropOverlay(
                                     Handle.BOTTOM -> b = dy.coerceIn(t + minSize, 1f)
                                     null -> {}
                                 }
-                                android.util.Log.d("revela", "crop resize -> $l,$t,$r,$b")
                                 onGeometryRef.value(
                                     g.copy(cropLeft = l, cropTop = t, cropRight = r, cropBottom = b)
                                 )
@@ -1037,7 +1386,6 @@ fun CropOverlay(
                                     .coerceIn(0f, 1f - cw)
                                 val t = ((change.position.y - moveOffset.y) / h)
                                     .coerceIn(0f, 1f - ch)
-                                android.util.Log.d("revela", "crop move -> $l,$t")
                                 onGeometryRef.value(
                                     g.copy(cropLeft = l, cropTop = t, cropRight = l + cw, cropBottom = t + ch)
                                 )
@@ -1049,7 +1397,6 @@ fun CropOverlay(
                                 val r = max(drawStart.x, p.x) / w
                                 val t = min(drawStart.y, p.y) / h
                                 val b = max(drawStart.y, p.y) / h
-                                android.util.Log.d("revela", "crop draw -> $l,$t,$r,$b")
                                 if (r - l > minSize / 2f && b - t > minSize / 2f) {
                                     onGeometryRef.value(
                                         g.copy(
@@ -1065,19 +1412,8 @@ fun CropOverlay(
                             CropMode.NONE -> {}
                         }
                     },
-                    onDragEnd = {
-                        // descarta selecciones minusculas dibujadas por error
-                        val g = geometryRef.value
-                        if (mode == CropMode.DRAW && (g.cropWidthNorm < 0.06f || g.cropHeightNorm < 0.06f)) {
-                            onGeometryRef.value(g.copy(cropLeft = 0.1f, cropTop = 0.1f, cropRight = 0.9f, cropBottom = 0.9f))
-                        }
-                        mode = CropMode.NONE
-                        handle = null
-                    },
-                    onDragCancel = {
-                        mode = CropMode.NONE
-                        handle = null
-                    }
+                    onDragEnd = { mode = CropMode.NONE; handle = null },
+                    onDragCancel = { mode = CropMode.NONE; handle = null }
                 )
             }
     ) {
@@ -1100,7 +1436,6 @@ fun CropOverlay(
                 size = Size(r - l, b - t),
                 style = Stroke(width = 2f)
             )
-            // tercios
             val cw = r - l
             val ch = b - t
             for (f in listOf(1f / 3f, 2f / 3f)) {
