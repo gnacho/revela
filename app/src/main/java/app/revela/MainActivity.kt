@@ -669,6 +669,38 @@ fun EditorScreen() {
                             }
                         }
 
+                        // Herramientas de valor (exposicion, contraste, saturacion, WB):
+                        // arrastre horizontal sobre la foto ajusta el valor.
+                        EditorTool.EXPOSURE, EditorTool.CONTRAST,
+                        EditorTool.SATURATION, EditorTool.WHITE_BALANCE -> {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .pointerInput(toolNow.id, wbParam) {
+                                        val range = EffectiveAdjustments.rangeFor(toolNow.id)
+                                        var start = 0f
+                                        detectHorizontalDragGestures(
+                                            onDragStart = {
+                                                start = EffectiveAdjustments.valueOf(
+                                                    effective(), toolNow.id, wbParam
+                                                )
+                                            },
+                                            onDragEnd = {
+                                                if (!dragValue.isNaN()) commitToolValue(dragValue)
+                                            },
+                                            onDragCancel = { dragValue = Float.NaN }
+                                        ) { change, dragAmount ->
+                                            change.consume()
+                                            val span = range.endInclusive - range.start
+                                            if (dragValue.isNaN()) dragValue = start
+                                            dragValue = (dragValue + dragAmount / (viewportWpx * 1.8f) * span)
+                                                .coerceIn(range.start, range.endInclusive)
+                                            workingAdj = makeWorking(toolNow.id, wbParam, dragValue)
+                                        }
+                                    }
+                            )
+                        }
+
                         else -> {}
                     }
                 }
@@ -1223,24 +1255,6 @@ fun CropPanel(
                 .padding(top = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = {
-                onChange(
-                    geometry.copy(
-                        quarterTurns = geometry.quarterTurns - 1,
-                        straightenDeg = 0f,
-                        cropLeft = 0f, cropTop = 0f, cropRight = 1f, cropBottom = 1f
-                    )
-                )
-            }) { Icon(Icons.Filled.RotateLeft, "Rotar a la izquierda", tint = Color.White) }
-            IconButton(onClick = {
-                onChange(
-                    geometry.copy(
-                        quarterTurns = geometry.quarterTurns + 1,
-                        straightenDeg = 0f,
-                        cropLeft = 0f, cropTop = 0f, cropRight = 1f, cropBottom = 1f
-                    )
-                )
-            }) { Icon(Icons.Filled.RotateRight, "Rotar a la derecha", tint = Color.White) }
             IconButton(onClick = {
                 onChange(
                     geometry.copy(
