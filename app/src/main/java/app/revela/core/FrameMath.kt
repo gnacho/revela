@@ -182,3 +182,36 @@ object FrameMath {
         return t * t * (3f - 2f * t)
     }
 }
+
+/** Pesos de filtro B/N (canal rojo/amarillo/verde/azul) sobre luminancia. */
+object BnwFilters {
+    val NEUTRAL = floatArrayOf(0.299f, 0.587f, 0.114f)
+    val RED = floatArrayOf(0.60f, 0.35f, 0.05f)
+    val YELLOW = floatArrayOf(0.45f, 0.45f, 0.10f)
+    val GREEN = floatArrayOf(0.30f, 0.50f, 0.20f)
+    val BLUE = floatArrayOf(0.15f, 0.25f, 0.60f)
+
+    fun byName(name: String): FloatArray = when (name) {
+        "red" -> RED
+        "yellow" -> YELLOW
+        "green" -> GREEN
+        "blue" -> BLUE
+        else -> NEUTRAL
+    }
+}
+
+/** Convierte el marco a blanco y negro con los pesos del filtro elegido. */
+fun applyBnw(pixels: IntArray, filter: String) {
+    val wts = BnwFilters.byName(filter)
+    val wr = wts[0]
+    val wg = wts[1]
+    val wb = wts[2]
+    for (i in pixels.indices) {
+        val p = pixels[i]
+        val r = (p shr 16) and 0xFF
+        val g = (p shr 8) and 0xFF
+        val b = p and 0xFF
+        val gray = (r * wr + g * wg + b * wb).toInt().coerceIn(0, 255)
+        pixels[i] = (p and 0xFF000000.toInt()) or (gray shl 16) or (gray shl 8) or gray
+    }
+}

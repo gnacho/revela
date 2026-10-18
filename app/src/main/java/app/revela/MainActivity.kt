@@ -62,6 +62,9 @@ import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Vignette
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.FilterBAndW
+import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.material.icons.filled.Tonality
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -81,6 +84,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -135,7 +139,9 @@ import app.revela.render.ExportProcessor
 import app.revela.render.PreviewRender
 import app.revela.render.SessionStore
 import app.revela.core.AutoLevels
+import app.revela.core.CustomStyle
 import app.revela.core.WbParam
+import app.revela.core.WelcomeStore
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
@@ -150,10 +156,13 @@ import kotlinx.coroutines.withContext
 enum class EditorTool(val id: String, val label: String) {
     TUNE("tune", "Ajustar imagen"),
     CURVES(Tool.CURVES, "Curvas"),
+    TONE(Tool.TONAL, "Contraste tonal"),
     SELECTIVE(Tool.SELECTIVE, "Selectivo"),
     VIGNETTE(Tool.VIGNETTE, "Vineta"),
     HEAL(Tool.HEAL, "Quitamanchas"),
-    CROP(Tool.CROP, "Recortar")
+    CROP(Tool.CROP, "Recortar"),
+    ROTATE("rotate", "Girar"),
+    BNW(Tool.BNW, "Blanco y negro")
 }
 
 /** Pestañas inferiores estilo Snapseed. */
@@ -216,6 +225,19 @@ fun EditorScreen() {
     var showRevertConfirm by remember { mutableStateOf(false) }
     var lookThumbs by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
 
+    // Estilos personalizados
+    var customStyles by remember {
+        mutableStateOf(app.revela.render.CustomStylesStore.load(context))
+    }
+    var customThumbs by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
+    var showStyleNameDialog by remember { mutableStateOf(false) }
+    var styleName by remember { mutableStateOf("") }
+    var deleteStyle by remember { mutableStateOf<CustomStyle?>(null) }
+    var selectedCustomId by remember { mutableStateOf<String?>(null) }
+
+    // Asistente de bienvenida
+    var showWelcome by remember { mutableStateOf(!WelcomeStore.isSeen(context.filesDir)) }
+
     // Selectivo
     var selParam by remember { mutableStateOf(SelParam.BRIGHTNESS) }
     var activePoint by remember { mutableIntStateOf(-1) }
@@ -239,6 +261,7 @@ fun EditorScreen() {
     fun effective(): app.revela.core.ColorMath.Adjustments {
         val toolId = when (val t = activeTool) {
             EditorTool.TUNE -> tuneParam.toolId
+            EditorTool.TONE -> Tool.TONAL
             null -> ""
             else -> t.id
         }
@@ -317,6 +340,27 @@ fun EditorScreen() {
             list = list.filterNot { it is Edit.Vignette } + Edit.Vignette(workingVignette)
         }
         return list
+    }
+
+    /** Filtro B/N comprometido en la pila (o null si no hay). */
+    fun currentBnwFilter(): String? = stack.edits.filterIsInstance<Edit.Bnw>().lastOrNull()?.filter
+
+    /** Gira el marco en cuartos de vuelta (90 grados por pulsacion). */
+    fun rotateBy(quarters: Int) {
+        geometry = geometry.copy(quarterTurns = geometry.quarterTurns + quarters)
+        viewScale = 1f
+        viewOffset = Offset.Zero
+        stackVersion++
+        persistSession()
+    }
+
+    /** Compromete los tres valores del contraste tonal como un unico edit. */
+    fun commitTonal() {
+        val cur = effective()
+        stack.apply(Edit.TonalContrast(cur.tonalShadows, cur.tonalMidtones, cur.tonalHighlights))
+        stackVersion++
+        workingAdj = null
+        persistSession()
     }
 
     val pickerLauncher = rememberLauncherForActivityResult(
@@ -404,16 +448,32 @@ fun EditorScreen() {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .statusBarsPadding()
-    ) {
-        // Barra superior
-        Row(
+    // Miniaturas de los estilos personalizados
+    LaunchedEffect(base, stackVersion, customStyles) {
+        val b = base ?: return@LaunchedEffect
+        launch(Dispatchers.Default) {
+            val map = mutableMapOf<String, ImageBitmap>()
+            for (cs in customStyles) {
+                val st = runCatching { EditStack.fromJson(cs.editsJson) }.getOrNull() ?: continue
+                map[cs.id] = app.revela.render.ThumbRender.forEdits(
+                    b, st, st.edits, geometry.quarterTurns
+                )
+            }
+            customThumbs = map
+        }
+    }
+
+    Box {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
+                .background(Color.Black)
+                .statusBarsPadding()
+        ) {
+            // Barra superior
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
                 .padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1017,6 +1077,22 @@ fun EditorScreen() {
                             else stack.apply(Edit.Look(look.id))
                             stackVersion++
                             persistSession()
+                        },
+                        customStyles = customStyles,
+                        customThumbs = customThumbs,
+                        selectedCustomId = selectedCustomId,
+                        onSelectCustom = { cs ->
+                            runCatching { EditStack.fromJson(cs.editsJson) }.getOrNull()?.let { st ->
+                                stack = st
+                                selectedCustomId = cs.id
+                                stackVersion++
+                                persistSession()
+                            }
+                        },
+                        onDeleteCustom = { deleteStyle = it },
+                        onSaveNew = {
+                            styleName = ""
+                            showStyleNameDialog = true
                         }
                     )
                 }
@@ -1265,8 +1341,139 @@ fun EditorScreen() {
                 )
             }
 
+            EditorTool.ROTATE -> Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF101014))
+                    .navigationBarsPadding()
+                    .padding(vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    OutlinedButton(onClick = { rotateBy(-1) }) {
+                        Icon(Icons.Filled.RotateLeft, contentDescription = null, tint = Color.White)
+                        Spacer(Modifier.width(6.dp))
+                        Text("90 izq", color = Color.White)
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    OutlinedButton(onClick = { rotateBy(1) }) {
+                        Icon(Icons.Filled.RotateRight, contentDescription = null, tint = Color.White)
+                        Spacer(Modifier.width(6.dp))
+                        Text("90 der", color = Color.White)
+                    }
+                }
+                Text(
+                    "Gira el marco en cuartos de vuelta. El enderece fino esta en Recortar.",
+                    color = Color.Gray,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp)
+                )
+            }
+
+            EditorTool.BNW -> {
+                val current = currentBnwFilter()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF101014))
+                        .navigationBarsPadding()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        listOf(
+                            "neutral" to "Neutro",
+                            "red" to "Rojo",
+                            "yellow" to "Amarillo",
+                            "green" to "Verde",
+                            "blue" to "Azul"
+                        ).forEach { (id, label) ->
+                            FilterChip(
+                                selected = current == id,
+                                onClick = {
+                                    stack.apply(Edit.Bnw(id))
+                                    stackVersion++
+                                    persistSession()
+                                },
+                                label = { Text(label, fontSize = 12.sp) },
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+                        FilterChip(
+                            selected = current == null,
+                            onClick = {
+                                stack.removeTool(Tool.BNW)
+                                stackVersion++
+                                persistSession()
+                            },
+                            label = { Text("Color", fontSize = 12.sp) },
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    }
+                    Text(
+                        "Cada filtro pondera los canales al pasar a blanco y negro.",
+                        color = Color.Gray,
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            EditorTool.TONE -> Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF101014))
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                TonalSlider("Sombras", effective().tonalShadows) { v ->
+                    workingAdj = effective().copy(tonalShadows = v)
+                }
+                TonalSlider("Medios", effective().tonalMidtones) { v ->
+                    workingAdj = effective().copy(tonalMidtones = v)
+                }
+                TonalSlider("Luces", effective().tonalHighlights) { v ->
+                    workingAdj = effective().copy(tonalHighlights = v)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    TextButton(onClick = {
+                        stack.removeTool(Tool.TONAL)
+                        stackVersion++
+                        workingAdj = null
+                        persistSession()
+                    }) { Text("Restablecer", color = Color.Gray) }
+                    Spacer(Modifier.width(16.dp))
+                    Button(onClick = {
+                        commitTonal()
+                        activeTool = null
+                    }) { Text("Aplicar") }
+                }
+            }
+
             else -> {}
 
+        }
+
+        if (showWelcome) {
+            WelcomeWizard(
+                onFinish = {
+                    WelcomeStore.markSeen(context.filesDir)
+                    showWelcome = false
+                }
+            )
         }
     }
 
@@ -1286,6 +1493,66 @@ fun EditorScreen() {
             },
             dismissButton = {
                 OutlinedButton(onClick = { showRevertConfirm = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    if (showStyleNameDialog) {
+        AlertDialog(
+            onDismissRequest = { showStyleNameDialog = false },
+            title = { Text("Guardar estilo") },
+            text = {
+                Column {
+                    Text("Guarda los ajustes actuales como estilo reutilizable.")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = styleName,
+                        onValueChange = { styleName = it },
+                        label = { Text("Nombre") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val name = styleName.trim()
+                        if (name.isNotEmpty()) {
+                            val cs = CustomStyle(
+                                id = "c" + System.currentTimeMillis(),
+                                name = name,
+                                editsJson = stack.toJson()
+                            )
+                            customStyles = customStyles + cs
+                            app.revela.render.CustomStylesStore.save(context, customStyles)
+                            selectedCustomId = cs.id
+                        }
+                        showStyleNameDialog = false
+                    },
+                    enabled = styleName.isNotBlank()
+                ) { Text("Guardar") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showStyleNameDialog = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    deleteStyle?.let { cs ->
+        AlertDialog(
+            onDismissRequest = { deleteStyle = null },
+            title = { Text("Borrar estilo") },
+            text = { Text("Se eliminara el estilo \"${cs.name}\". La foto no se toca.") },
+            confirmButton = {
+                Button(onClick = {
+                    customStyles = customStyles.filterNot { it.id == cs.id }
+                    app.revela.render.CustomStylesStore.save(context, customStyles)
+                    if (selectedCustomId == cs.id) selectedCustomId = null
+                    deleteStyle = null
+                }) { Text("Borrar") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { deleteStyle = null }) { Text("Cancelar") }
             }
         )
     }
@@ -1311,6 +1578,7 @@ fun EditorScreen() {
                 }
             }
         )
+    }
     }
 }
 
@@ -1907,10 +2175,13 @@ fun ToolsGrid(modifier: Modifier = Modifier, onSelect: (EditorTool) -> Unit) {
     val tools = listOf(
         Triple(EditorTool.TUNE, Icons.Filled.Tune, "Ajustar imagen"),
         Triple(EditorTool.CURVES, Icons.Filled.ShowChart, "Curvas"),
-        Triple(EditorTool.CROP, Icons.Filled.Crop, "Recortar"),
+        Triple(EditorTool.TONE, Icons.Filled.Tonality, "Contraste tonal"),
         Triple(EditorTool.SELECTIVE, Icons.Filled.CenterFocusStrong, "Selectivo"),
         Triple(EditorTool.HEAL, Icons.Filled.Healing, "Quitamanchas"),
-        Triple(EditorTool.VIGNETTE, Icons.Filled.Vignette, "Viñeta")
+        Triple(EditorTool.VIGNETTE, Icons.Filled.Vignette, "Viñeta"),
+        Triple(EditorTool.CROP, Icons.Filled.Crop, "Recortar"),
+        Triple(EditorTool.ROTATE, Icons.Filled.RotateRight, "Girar"),
+        Triple(EditorTool.BNW, Icons.Filled.FilterBAndW, "Blanco y negro")
     )
     Column(
         modifier = modifier
@@ -1957,7 +2228,13 @@ fun ToolsGrid(modifier: Modifier = Modifier, onSelect: (EditorTool) -> Unit) {
 fun LooksCarousel(
     thumbs: Map<String, ImageBitmap>,
     selectedId: String,
-    onSelect: (Look) -> Unit
+    onSelect: (Look) -> Unit,
+    customStyles: List<CustomStyle> = emptyList(),
+    customThumbs: Map<String, ImageBitmap> = emptyMap(),
+    selectedCustomId: String? = null,
+    onSelectCustom: (CustomStyle) -> Unit = {},
+    onDeleteCustom: (CustomStyle) -> Unit = {},
+    onSaveNew: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -2005,6 +2282,81 @@ fun LooksCarousel(
                 )
             }
         }
+        customStyles.forEach { cs ->
+            val sel = cs.id == selectedCustomId
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onSelectCustom(cs) }
+                    .padding(4.dp)
+            ) {
+                Box {
+                    val th = customThumbs[cs.id]
+                    if (th != null) {
+                        Image(
+                            bitmap = th,
+                            contentDescription = cs.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(
+                                    width = if (sel) 2.dp else 1.dp,
+                                    color = if (sel) Color(0xFFB388FF) else Color(0xFF333340),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(Color(0xFF1A1A20), RoundedCornerShape(8.dp))
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(2.dp)
+                            .size(18.dp)
+                            .background(Color(0xCC101014), RoundedCornerShape(9.dp))
+                            .clickable { onDeleteCustom(cs) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("x", color = Color.White, fontSize = 11.sp)
+                    }
+                }
+                Text(
+                    cs.name,
+                    color = if (sel) Color(0xFFB388FF) else Color.Gray,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { onSaveNew() }
+                .padding(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .background(Color(0xFF1A1A20), RoundedCornerShape(8.dp))
+                    .border(1.dp, Color(0xFF333340), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("+", color = Color.White, fontSize = 26.sp)
+            }
+            Text(
+                "Guardar",
+                color = Color.Gray,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
     }
 }
 
@@ -2024,5 +2376,26 @@ fun HistogramView(bins: IntArray, modifier: Modifier = Modifier) {
                 )
             }
         }
+    }
+}
+
+/** Deslizador de una zona tonal (-1..1) con etiqueta y valor legible. */
+@Composable
+fun TonalSlider(label: String, value: Float, onChange: (Float) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth()) {
+            Text(label, color = Color.White, fontSize = 12.sp)
+            Spacer(Modifier.weight(1f))
+            Text(
+                if (value >= 0f) "+${"%.1f".format(value)}" else "%.1f".format(value),
+                color = Color.Gray,
+                fontSize = 12.sp
+            )
+        }
+        Slider(
+            value = value,
+            onValueChange = onChange,
+            valueRange = -1f..1f
+        )
     }
 }

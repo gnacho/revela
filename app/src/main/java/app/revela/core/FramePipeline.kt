@@ -32,6 +32,14 @@ object FramePipeline {
         val adj = adjOverride ?: EffectiveAdjustments.fromEdits(edits)
         ColorMath.applyInPlace(pixels, ColorMath.buildLuts(adj), adj.saturation)
 
+        // 2b) blanco y negro: pesos de filtro por canal (tramo final de color)
+        for (e in edits) {
+            if (e is Edit.Bnw) {
+                applyBnw(pixels, e.filter)
+                break
+            }
+        }
+
         // 3) selectivo + 4) vineta
         for (e in edits) {
             when (e) {

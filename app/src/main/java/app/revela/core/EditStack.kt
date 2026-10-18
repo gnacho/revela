@@ -16,6 +16,8 @@ object Tool {
     const val VIGNETTE = "vignette"
     const val HEAL = "heal"
     const val LOOK = "look"
+    const val BNW = "bnw"
+    const val TONAL = "tonalContrast"
 }
 
 /** Punto de control selectivo (coordenadas normalizadas al marco). */
@@ -85,6 +87,22 @@ sealed interface Edit {
     @SerialName("look")
     data class Look(val id: String = "none") : Edit {
         override val toolId: String get() = Tool.LOOK
+    }
+
+    @Serializable
+    @SerialName("bnw")
+    data class Bnw(val filter: String = "neutral") : Edit {
+        override val toolId: String get() = Tool.BNW
+    }
+
+    @Serializable
+    @SerialName("tonalContrast")
+    data class TonalContrast(
+        val shadows: Float = 0f,
+        val midtones: Float = 0f,
+        val highlights: Float = 0f
+    ) : Edit {
+        override val toolId: String get() = Tool.TONAL
     }
 }
 

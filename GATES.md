@@ -39,4 +39,29 @@ Scope: la rejilla de herramientas se abre como panel animado (slide-up ~250 ms) 
   EXPECT: AUTO_GATE_OK
   EVIDENCE: automatic-evidence=v1; definition-sha256=9079fc130f8f6165b27a80be6b25fda4fb0331ff326d8e6ea9f4da759246cf97; exit=0; EXPECT=matched; output-sha256=07fbe60ec5036cf8aa450bd513f86d91d41930a81d767eff386bf9693a2cc90f; output-bytes=21; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git; path=13199a136530/15 entries
 
+- [x] G8: Blanco y Negro: el pipeline convierte a gris con pesos de filtro (test JVM)
+  CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && grep -q "BnwPipelineTest" app/build/test-results/testDebugUnitTest/TEST-app.revela.core.BnwPipelineTest.xml 2>/dev/null && echo BNW_OK
+  EXPECT: BNW_OK
+  EVIDENCE: automatic-evidence=v1; definition-sha256=4b883d5616e998184ee326ccc3fa698bd9dd8b9409378ef053ef69a852721f71; exit=0; EXPECT=matched; output-sha256=a1715972e0a140458bc403006fbb8a5da6d03f10d692b5a0a04d03874a9d0941; output-bytes=7; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git; path=13199a136530/15 entries
+
+- [x] G9: Contraste tonal: LUT por zonas (sombras/medios/luces) con test JVM
+  CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && grep -q "TonalContrastTest" app/build/test-results/testDebugUnitTest/TEST-app.revela.core.TonalContrastTest.xml 2>/dev/null && echo TONAL_OK
+  EXPECT: TONAL_OK
+  EVIDENCE: automatic-evidence=v1; definition-sha256=e2fb8924d213fb4250774e6ac8ee97c2fa711d558d048da7035b01e832b28b4f; exit=0; EXPECT=matched; output-sha256=663b4a8b41ffe396d07c3b062f313349000d5587daa1184188bf47c3883608a7; output-bytes=9; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git; path=13199a136530/15 entries
+
+- [x] G10: Estilos personalizables: codec JSON ida y vuelta con test JVM
+  CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && grep -q "CustomStylesTest" app/build/test-results/testDebugUnitTest/TEST-app.revela.core.CustomStylesTest.xml 2>/dev/null && echo STYLES_OK
+  EXPECT: STYLES_OK
+  EVIDENCE: automatic-evidence=v1; definition-sha256=f241caf73d7ab8178409a8ff268062701caf03f4268f54168a480d66a43eac21; exit=0; EXPECT=matched; output-sha256=ca7ce68687fe55a45146a338ed1bb8f364fa99ebdb7860f5976e541205062fb9; output-bytes=10; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git; path=13199a136530/15 entries
+
+- [x] G11: Asistente de bienvenida: flag visto persistente con test JVM y cableado en UI
+  CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && grep -q "WelcomeStore" app/src/main/java/app/revela/core/WelcomeStore.kt && grep -q "WelcomeWizard" app/src/main/java/app/revela/MainActivity.kt && echo WELCOME_OK
+  EXPECT: WELCOME_OK
+  EVIDENCE: automatic-evidence=v1; definition-sha256=c390100c288105ae3463351fded0b0c47755c49f71dde9c90bf6f660700509fd; exit=0; EXPECT=matched; output-sha256=7dc5b48aa467ba11f9240758fdaaaaa72acdc5ce065fc359d201b08ac15ee0b4; output-bytes=11; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git; path=13199a136530/15 entries
+
+- [x] G12: la rejilla del release en emulador muestra Girar, Blanco y negro y Contraste tonal (>= 9 herramientas) y el asistente aparece la 1a vez
+  CHECK: export PATH=$HOME/Android/Sdk/platform-tools:$PATH && cd /home/nacho/Documentos/Repos/revela-git && adb -s emulator-5554 uninstall app.revela > /dev/null 2>&1; adb -s emulator-5554 install app/build/outputs/apk/release/app-release.apk > /dev/null 2>&1 && adb -s emulator-5554 shell am start -n app.revela/.MainActivity > /dev/null 2>&1 && sleep 3 && adb -s emulator-5554 shell uiautomator dump /data/local/tmp/g12w.xml > /dev/null 2>&1 && adb -s emulator-5554 pull /data/local/tmp/g12w.xml /tmp/opencode/g12w.xml > /dev/null 2>&1 && grep -q "Bienvenido a revela" /tmp/opencode/g12w.xml && adb -s emulator-5554 shell input tap 154 2242 && sleep 1 && adb -s emulator-5554 shell input tap 540 1227 && sleep 3 && adb -s emulator-5554 shell input tap 179 1405 && sleep 4 && adb -s emulator-5554 shell input tap 540 2264 && sleep 1.5 && adb -s emulator-5554 shell uiautomator dump /data/local/tmp/g12.xml > /dev/null 2>&1 && adb -s emulator-5554 pull /data/local/tmp/g12.xml /tmp/opencode/g12.xml > /dev/null 2>&1 && python3 -c "x=open('/tmp/opencode/g12.xml').read(); assert 'Girar' in x and 'Blanco y negro' in x and 'Contraste tonal' in x, 'faltan tools'" && echo GRID_OK
+  EXPECT: GRID_OK
+  EVIDENCE: automatic-evidence=v1; definition-sha256=fca39a8bb2802101b57dc49ab1adbf574efe33430907f33a3c0b5e67d2e151a9; exit=0; EXPECT=matched; output-sha256=867d5909215690eeb95696f392fa4881e53a38b9b081a5adf59d6f2429611ae7; output-bytes=8; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git; path=13199a136530/15 entries
+
 Handoff (fuera de los gates): el bug de iconos del OnePlus quedó resuelto el 18-Oct (la build actual los renderiza bien en el dispositivo, captura verificada); pendiente solo la confirmación visual del usuario.

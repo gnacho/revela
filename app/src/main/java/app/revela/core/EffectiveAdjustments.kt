@@ -26,7 +26,12 @@ object EffectiveAdjustments {
                     )
                 }
                 // sanar/selectivo/vineta son pases de marco, no ajustes globales
-                is Edit.Heal, is Edit.Selective, is Edit.Vignette -> a
+                is Edit.TonalContrast -> a.copy(
+                    tonalShadows = edit.shadows,
+                    tonalMidtones = edit.midtones,
+                    tonalHighlights = edit.highlights
+                )
+                is Edit.Heal, is Edit.Selective, is Edit.Vignette, is Edit.Bnw -> a
             }
         }
         return a
@@ -41,6 +46,11 @@ object EffectiveAdjustments {
             Tool.SATURATION -> base.copy(saturation = working.saturation)
             Tool.WHITE_BALANCE -> base.copy(temperature = working.temperature, tint = working.tint)
             Tool.CURVES -> base.copy(curve = working.curve)
+            Tool.TONAL -> base.copy(
+                tonalShadows = working.tonalShadows,
+                tonalMidtones = working.tonalMidtones,
+                tonalHighlights = working.tonalHighlights
+            )
             else -> base
         }
     }

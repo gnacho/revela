@@ -18,6 +18,9 @@ object ColorMath {
         val saturation: Float = 0f,      // -1..1
         val temperature: Float = 0f,     // -1..1 (frio->calido)
         val tint: Float = 0f,            // -1..1 (verde->magenta)
+        val tonalShadows: Float = 0f,    // -1..1 (contraste tonal por zonas)
+        val tonalMidtones: Float = 0f,   // -1..1
+        val tonalHighlights: Float = 0f, // -1..1
         val curve: List<CurvePoint>? = null
     )
 
@@ -30,14 +33,15 @@ object ColorMath {
         val mulB = exposureMul * (1f - a.temperature * 0.25f)
         val contrastMul = 1f + a.contrast
         val curveLut = a.curve?.let { CurveMath.lut(it) }
+        val tonal = tonalDelta(a.tonalShadows, a.tonalMidtones, a.tonalHighlights)
         return listOf(
-            lutFor(mulR, contrastMul, curveLut),
-            lutFor(mulG, contrastMul, curveLut),
-            lutFor(mulB, contrastMul, curveLut)
+            lutFor(mulR, contrastMul, curveLut, tonal),
+            lutFor(mulG, contrastMul, curveLut, tonal),
+            lutFor(mulB, contrastMul, curveLut, tonal)
         )
     }
 
-    private fun lutFor(mul: Float, contrastMul: Float, curveLut: FloatArray?): FloatArray {
+    private fun lutFor(mul: Float, contrastMul: Float, curveLut: FloatArray?, tonal: TonalDelta?): FloatArray {
         val out = FloatArray(LUT_SIZE)
         for (i in 0 until LUT_SIZE) {
             var v = (i / 255f) * mul
@@ -48,9 +52,35 @@ object ColorMath {
                 if (idx > 255) idx = 255
                 v = curveLut[idx]
             }
+            if (tonal != null) {
+                v = (v + tonal.delta[i] / 255f).coerceIn(0f, 1f)
+            }
             out[i] = v.coerceIn(0f, 1f)
         }
         return out
+    }
+
+    /** Deltas de nivel (0..255) por zona tonal; 0 = sin cambio. */
+    data class TonalDelta(val delta: FloatArray)
+
+    fun tonalDelta(shadows: Float, midtones: Float, highlights: Float): TonalDelta? {
+        if (shadows == 0f && midtones == 0f && highlights == 0f) return null
+        val d = FloatArray(LUT_SIZE)
+        for (i in 0 until LUT_SIZE) {
+            val v = i / 255f
+            // pesos de zona con caida coseno suave; centros: sombras 0.0, medios 0.5, luces 1.0
+            val wS = zoneWeight(v, 0.0f, 0.5f)
+            val wM = zoneWeight(v, 0.5f, 0.5f)
+            val wH = zoneWeight(v, 1.0f, 0.5f)
+            d[i] = (shadows * wS + midtones * wM + highlights * wH) * 60f
+        }
+        return TonalDelta(d)
+    }
+
+    private fun zoneWeight(v: Float, center: Float, halfSpan: Float): Float {
+        val dist = abs(v - center) / halfSpan
+        if (dist >= 1f) return 0f
+        return 0.5f * (1f + kotlin.math.cos(Math.PI * dist).toFloat())
     }
 
     fun saturationFactor(amount: Float): Float = 1f + amount

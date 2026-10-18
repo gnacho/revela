@@ -22,6 +22,28 @@ object ThumbRender {
         quarterTurns: Int,
         maxSide: Int = 220
     ): Map<String, ImageBitmap> {
+        val baseImg = preparedBase(base, quarterTurns, maxSide)
+        val out = mutableMapOf<String, ImageBitmap>()
+        for (look in Look.entries) {
+            val withoutLooks = edits.filterNot { it is Edit.Look }
+            val e = if (look.id == "none") withoutLooks else withoutLooks + Edit.Look(look.id)
+            out[look.id] = renderEdits(baseImg, stack, e)
+        }
+        return out
+    }
+
+    /** Miniatura de la foto con una lista de edits arbitraria (estilos personalizados). */
+    fun forEdits(
+        base: BaseImage,
+        stack: EditStack,
+        edits: List<Edit>,
+        quarterTurns: Int,
+        maxSide: Int = 220
+    ): ImageBitmap = renderEdits(preparedBase(base, quarterTurns, maxSide), stack, edits)
+
+    private data class Prepared(val px: IntArray, val w: Int, val h: Int)
+
+    private fun preparedBase(base: BaseImage, quarterTurns: Int, maxSide: Int): Prepared {
         val scale = min(1f, maxSide.toFloat() / maxOf(base.width, base.height))
         val tw = max(1, (base.width * scale).roundToInt())
         val th = max(1, (base.height * scale).roundToInt())
@@ -36,14 +58,12 @@ object ThumbRender {
             w = r.second
             h = r.third
         }
-        val out = mutableMapOf<String, ImageBitmap>()
-        for (look in Look.entries) {
-            val withoutLooks = edits.filterNot { it is Edit.Look }
-            val e = if (look.id == "none") withoutLooks else withoutLooks + Edit.Look(look.id)
-            val copy = px.copyOf()
-            FramePipeline.apply(copy, w, h, stack, e)
-            out[look.id] = Bitmap.createBitmap(copy, w, h, Bitmap.Config.ARGB_8888).asImageBitmap()
-        }
-        return out
+        return Prepared(px, w, h)
+    }
+
+    private fun renderEdits(prep: Prepared, stack: EditStack, edits: List<Edit>): ImageBitmap {
+        val copy = prep.px.copyOf()
+        FramePipeline.apply(copy, prep.w, prep.h, stack, edits)
+        return Bitmap.createBitmap(copy, prep.w, prep.h, Bitmap.Config.ARGB_8888).asImageBitmap()
     }
 }

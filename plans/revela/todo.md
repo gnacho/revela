@@ -19,32 +19,26 @@ updated: "2026-10-18"
 
 ### Pending
 
-- [ ] Capturas del README desactualizadas (muestran la UI previa al rediseño Snapseed; rehacer 6 capturas + panel nuevo) <!-- added: 2026-10-18 -->
+- [ ] Capturas del README desactualizadas (muestran la UI previa al rediseño Snapseed; rehacer con la rejilla 3x3 + wizard) <!-- added: 2026-10-18 -->
 - [x] Analisis REA de Snapseed completo (28 tools, medidas, gestos, flujos) <!-- done: 2026-10-18 -->
-- [ ] BUG: iconos invisibles en el OnePlus Open (release 0.1.0): en el emulador el MISMO APK los muestra bien (verificado 18-Oct); pide captura de pantalla al usuario o comparte pantalla; hipotesis: OxygenOS 16 + algo especifico del dispositivo, NO R8 <!-- added: 2026-10-18 -->
-- [ ] FASE 5 (en curso): panel Herramientas overlay animado slide-up ~250ms + scrim, foto SIEMPRE visible, tab bar persistente (patron Snapseed medido: panel hasta 68% inferior) <!-- added: 2026-10-18 -->
-- [ ] FASE 5: renombrados ES de Snapseed: Sanar->Quitamanchas, Ajustar->Ajustar imagen; rejilla 5 columnas <!-- added: 2026-10-18 -->
-- [ ] FASE 6: AUTO en Ajustar imagen (auto-niveles histograma + snackbar Deshacer) = "mejorar foto" del usuario; histograma live + comparar antes/despres (mantener pulsado) <!-- added: 2026-10-18 -->
-- [ ] FASE 7: ASISTENTE DE BIENVENIDA propio (3 pasos: que es revela / 100% offline-privacidad / gesto vertical-horizontal de Ajustar imagen con demo interactiva); saltarlo al abrir la 2a vez, reanudable desde el menu <!-- added: 2026-10-18 -->
-- [ ] FASE 8: ESTILOS personalizables ("Personalizar" del usuario): crear estilo propio desde los ajustes actuales, renombrar, borrar, reordenar; persistidos en la sesion <!-- added: 2026-10-18 -->
-- [ ] FASE 9: Ambiance (param Tune tipo Snapseed) + Detalles (estructura+enfoque via unsharp) + Balance de blancos como tool (temp+tinte+auto) <!-- added: 2026-10-18 -->
-- [ ] FASE 10: Geometria completa: Girar 90, Perspectiva (libre y vertical/horizontal), Expandir (relleno inteligente simple: clamp/borroso) <!-- added: 2026-10-18 -->
-- [ ] FASE 11: Contraste tonal (sombras/medios/luces), HDR-scape suave (2 frames sinteticos), B/N con filtros de color (rojo/amarillo/verde/azul) <!-- added: 2026-10-18 -->
-- [ ] FASE 12: Creativas: Texto (tipografias + color + desplazamiento), Marcos (bordes propios sin assets de terceros), Doble exposicion (blend modes), Desenfoque de lente (bokeh radial/lineal) <!-- added: 2026-10-18 -->
-- [ ] FASE 13: Pincel (dodge/burn/exposicion/saturacion/temp por pinceladas con mascara), Selectivo v2 (visualizar mascara, umbral de area, mas params) <!-- added: 2026-10-18 -->
-- [ ] FASE 14: Stack avanzado: View edits por capas (ocultar/modificar/eliminar por herramienta), Undo/Redo/Revert en sheet, export con Settings (sizing long-edge, formato JPG/PNG, calidad) + Share intent Android <!-- added: 2026-10-18 -->
-- [ ] FASE 15: Settings de revela (tema, export) + "Tutoriales" propios (tips por herramienta, patron Snapseed) <!-- added: 2026-10-18 -->
+- [x] BUG iconos OnePlus: RESUELTO - la build nueva los renderiza bien en el dispositivo (captura 18-Oct); era la build vieja <!-- done: 2026-10-18 -->
+- [ ] FASE 9: Detalles (estructura+enfoque via unsharp), Ambiance (param Tune), Balance de blancos como tool, Perspectiva y Expandir (geometria) <!-- added: 2026-10-18 -->
+- [ ] FASE 10: Creativas: Texto (tipografias + color + desplazamiento), Marcos (bordes propios), Doble exposicion (blend modes), Desenfoque de lente (bokeh radial/lineal) <!-- added: 2026-10-18 -->
+- [ ] FASE 11: Pincel (dodge/burn/exposicion/saturacion/temp por pinceladas con mascara), Selectivo v2 (visualizar mascara, umbral de area, mas params), HDR-scape suave (2 frames sinteticos) <!-- added: 2026-10-18 -->
+- [ ] FASE 12: Stack avanzado: View edits por capas (ocultar/modificar/eliminar por herramienta), Undo/Redo/Revert en sheet, export con Settings (sizing long-edge, formato JPG/PNG, calidad) + Share intent Android <!-- added: 2026-10-18 -->
+- [ ] FASE 13: Settings de revela (tema, export) + "Tutoriales" propios (tips por herramienta, patron Snapseed) + reordenar/renombrar estilos personalizados <!-- added: 2026-10-18 -->
 - [ ] Pendiente de fase 3: decision de publicacion (repo publico AGPL + landing) <!-- added: 2026-10-12 -->
 - [ ] Pulir radios de agarre del crop (26dp -> ~18dp) y layout del slider Enderezar en pantallas estrechas <!-- added: 2026-10-12 -->
 - [ ] Calidad del inpaint en zonas grandes (valorar OpenCV si no basta la difusion) <!-- added: 2026-10-12 -->
-- [ ] Validar en el OnePlus fisico: gestos tactiles + rendimiento (cable flaky) <!-- added: 2026-10-12 -->
+- [ ] Validar en el OnePlus fisico: gestos tactiles de las 9 tools + wizard + estilos (cable flaky) <!-- added: 2026-10-12 -->
 
 ### In Progress
 
-- [ ] FASE 7: ASISTENTE DE BIENVENIDA propio (3 pasos: que es revela / 100% offline-privacidad / gesto vertical-horizontal con demo interactiva); se salta a la 2a apertura, reanudable desde el menu <!-- added: 2026-10-18 -->
+(nada - siguiente: fase 9)
 
 ### Completed
 
+- [x] FASES 7-8 (lote gap-closure, gates 12/12): Girar (90 izq/der sobre quarterTurns), Blanco y negro con filtros (Neutro/Rojo/Amarillo/Verde/Azul; stage pipeline applyBnw tras color), Contraste tonal (sombras/medios/luces por LUT de zonas coseno +-60 niveles), ESTILOS PERSONALIZABLES (tile + en Estilos: guardar ajustes actuales con nombre, miniatura viva propia via ThumbRender.forEdits, aplicar con tap, borrar con x, persistidos en revela_estilos.json), ASISTENTE DE BIENVENIDA (3 pasos con transiciones slide+fade, Saltar, marca persistente revela_bienvenida.txt, aparece en la 1a apertura - verificado en emulador con instalacion limpia); rejilla 3x3 = 9 herramientas; G8-G10 tests JVM nuevos, G12 verifica wizard+rejilla en release; 52/52 tests. Instalado en OnePlus <!-- completed: 2026-10-18 -->
 - [x] FASE 6: boton AUTO de un toque (AutoLevels: percentiles 0.5/99.5 -> exposicion max 0.6EV + contraste estirado + microsaturacion), snackbar "Auto ajustado" con Deshacer (reset al snapshot previo), histograma de luminancia en vivo (48 tramos) en el panel de Ajustar imagen; gates 7/7 (el G7 verifica 0.0 EV -> +0.6 EV en el indicador tras pulsar la varita en release); 41/41 tests. Instalado en el OnePlus: iconos OK en el dispositivo (captura) <!-- completed: 2026-10-18 -->
 - [x] FASE 5: panel Herramientas overlay animado (slide-up 250ms + scrim, foto SIEMPRE visible), rejilla 3 col, renombrados Ajustar imagen/Quitamanchas; fix crash al abrir URI rota (decode try/catch + estado intacto); gates unlazy 5/5 en emulador release <!-- completed: 2026-10-18 -->
 - [x] FASE 0: toolchain + esqueleto + build <!-- completed: 2026-10-12 -->
