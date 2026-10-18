@@ -25,7 +25,12 @@ object PreviewRender {
     /** Decodifica la imagen a tamano de preview (lado mayor acotado). */
     suspend fun decode(resolver: ContentResolver, uri: Uri): BaseImage? = withContext(Dispatchers.IO) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        val boundsStream = resolver.openInputStream(uri)
+        val boundsStream = try {
+            resolver.openInputStream(uri)
+        } catch (e: Exception) {
+            android.util.Log.e("revela", "decode: uri no abrible (${e.javaClass.simpleName}: ${e.message})")
+            return@withContext null
+        }
         if (boundsStream == null) {
             android.util.Log.e("revela", "decode: openInputStream null (bounds)")
             return@withContext null
@@ -45,7 +50,12 @@ object PreviewRender {
             inSampleSize = sample
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
-        val decodeStream = resolver.openInputStream(uri)
+        val decodeStream = try {
+            resolver.openInputStream(uri)
+        } catch (e: Exception) {
+            android.util.Log.e("revela", "decode: uri no abrible 2a lectura (${e.javaClass.simpleName}: ${e.message})")
+            return@withContext null
+        }
         if (decodeStream == null) {
             android.util.Log.e("revela", "decode: openInputStream null (decode)")
             return@withContext null

@@ -9,6 +9,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -137,11 +144,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 enum class EditorTool(val id: String, val label: String) {
-    TUNE("tune", "Ajustar"),
+    TUNE("tune", "Ajustar imagen"),
     CURVES(Tool.CURVES, "Curvas"),
     SELECTIVE(Tool.SELECTIVE, "Selectivo"),
     VIGNETTE(Tool.VIGNETTE, "Vineta"),
-    HEAL(Tool.HEAL, "Sanar"),
+    HEAL(Tool.HEAL, "Quitamanchas"),
     CROP(Tool.CROP, "Recortar")
 }
 
@@ -286,6 +293,8 @@ fun EditorScreen() {
                     "revela",
                     "perf decode=${android.os.SystemClock.elapsedRealtime() - t0}ms ok=${loaded != null} ${loaded?.width}x${loaded?.height}"
                 )
+                // URI no abrible: se conserva el estado actual (sin reset ni crash)
+                if (loaded == null) return@launch
                 base = loaded
                 originalBitmap = loaded?.toBitmap()
                 sourceUri = uri
@@ -508,18 +517,9 @@ fun EditorScreen() {
                 }
             }
         }
-        // Ventana de imagen (o rejilla de herramientas a pantalla completa)
-        if (activeTool == null && bottomTab == BottomTab.TOOLS) {
-            ToolsGrid(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                onSelect = {
-                    activeTool = it
-                    bottomTab = BottomTab.NONE
-                }
-            )
-        } else BoxWithConstraints(
+        // Ventana de imagen (siempre visible) + overlay de herramientas (patron Snapseed:
+        // panel que sube desde abajo ~250 ms con velo, la foto nunca deja de verse)
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -889,6 +889,45 @@ fun EditorScreen() {
                     }
                 }
             }
+
+                // Velo oscuro sobre la foto mientras el panel esta abierto (la foto sigue visible)
+                val toolsOpen = activeTool == null && bottomTab == BottomTab.TOOLS && base != null
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = toolsOpen,
+                    enter = fadeIn(animationSpec = tween(150)),
+                    exit = fadeOut(animationSpec = tween(150)),
+                    modifier = Modifier.matchParentSize()
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.45f))
+                            .pointerInput(Unit) {
+                                detectTapGestures { bottomTab = BottomTab.NONE }
+                            }
+                    )
+                }
+                // Panel de herramientas: sube desde abajo ~250 ms (patron Snapseed medido)
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = toolsOpen,
+                    enter = slideInVertically(
+                        animationSpec = tween(250, easing = FastOutSlowInEasing),
+                        initialOffsetY = { it }
+                    ),
+                    exit = slideOutVertically(
+                        animationSpec = tween(200, easing = FastOutSlowInEasing),
+                        targetOffsetY = { it }
+                    ),
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                ) {
+                    ToolsGrid(
+                        modifier = Modifier.fillMaxWidth(),
+                        onSelect = {
+                            activeTool = it
+                            bottomTab = BottomTab.NONE
+                        }
+                    )
+                }
         }
 
         // Paneles inferiores
@@ -1759,45 +1798,53 @@ fun TabButton(
     }
 }
 
-/** Rejilla de herramientas a pantalla completa (estilo Snapseed). */
+/** Panel de herramientas (overlay inferior animado; la foto queda visible detras del velo). */
 @Composable
 fun ToolsGrid(modifier: Modifier = Modifier, onSelect: (EditorTool) -> Unit) {
     val tools = listOf(
-        Triple(EditorTool.TUNE, Icons.Filled.Tune, "Ajustar"),
+        Triple(EditorTool.TUNE, Icons.Filled.Tune, "Ajustar imagen"),
         Triple(EditorTool.CURVES, Icons.Filled.ShowChart, "Curvas"),
         Triple(EditorTool.CROP, Icons.Filled.Crop, "Recortar"),
         Triple(EditorTool.SELECTIVE, Icons.Filled.CenterFocusStrong, "Selectivo"),
-        Triple(EditorTool.HEAL, Icons.Filled.Healing, "Sanar"),
+        Triple(EditorTool.HEAL, Icons.Filled.Healing, "Quitamanchas"),
         Triple(EditorTool.VIGNETTE, Icons.Filled.Vignette, "Viñeta")
     )
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+    Column(
         modifier = modifier
-            .background(Color.Black)
-            .padding(14.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+            .background(Color(0xFF101014))
+            .padding(horizontal = 14.dp, vertical = 16.dp)
     ) {
-        items(tools) { (tool, icon, label) ->
-            Card(
-                onClick = { onSelect(tool) },
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF16161C))
+        tools.chunked(3).forEach { rowTools ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(icon, label, tint = Color.White)
-                    Text(
-                        label,
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
+                rowTools.forEach { (tool, icon, label) ->
+                    Card(
+                        onClick = { onSelect(tool) },
+                        modifier = Modifier.weight(1f),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF16161C))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(icon, label, tint = Color.White)
+                            Text(
+                                label,
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        }
+                    }
                 }
             }
+            Spacer(Modifier.height(10.dp))
         }
     }
 }
