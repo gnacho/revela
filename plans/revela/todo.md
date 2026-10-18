@@ -41,10 +41,11 @@ updated: "2026-10-18"
 
 ### In Progress
 
-- [ ] FASE 6: AUTO en Ajustar imagen (auto-niveles histograma + snackbar Deshacer) + histograma live + comparar antes/después <!-- added: 2026-10-18 -->
+- [ ] FASE 7: ASISTENTE DE BIENVENIDA propio (3 pasos: que es revela / 100% offline-privacidad / gesto vertical-horizontal con demo interactiva); se salta a la 2a apertura, reanudable desde el menu <!-- added: 2026-10-18 -->
 
 ### Completed
 
+- [x] FASE 6: boton AUTO de un toque (AutoLevels: percentiles 0.5/99.5 -> exposicion max 0.6EV + contraste estirado + microsaturacion), snackbar "Auto ajustado" con Deshacer (reset al snapshot previo), histograma de luminancia en vivo (48 tramos) en el panel de Ajustar imagen; gates 7/7 (el G7 verifica 0.0 EV -> +0.6 EV en el indicador tras pulsar la varita en release); 41/41 tests. Instalado en el OnePlus: iconos OK en el dispositivo (captura) <!-- completed: 2026-10-18 -->
 - [x] FASE 5: panel Herramientas overlay animado (slide-up 250ms + scrim, foto SIEMPRE visible), rejilla 3 col, renombrados Ajustar imagen/Quitamanchas; fix crash al abrir URI rota (decode try/catch + estado intacto); gates unlazy 5/5 en emulador release <!-- completed: 2026-10-18 -->
 - [x] FASE 0: toolchain + esqueleto + build <!-- completed: 2026-10-12 -->
 - [x] FASE 1: nucleo + UI + export + tests + validacion emulador + fixes (bounds-trap, rotacion, recorte v2, pinch, configChanges) <!-- completed: 2026-10-12 -->

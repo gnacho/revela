@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Vignette
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -133,6 +134,7 @@ import app.revela.render.ExportOptions
 import app.revela.render.ExportProcessor
 import app.revela.render.PreviewRender
 import app.revela.render.SessionStore
+import app.revela.core.AutoLevels
 import app.revela.core.WbParam
 import kotlin.math.abs
 import kotlin.math.cos
@@ -141,7 +143,9 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class EditorTool(val id: String, val label: String) {
     TUNE("tune", "Ajustar imagen"),
@@ -225,6 +229,11 @@ fun EditorScreen() {
     val strokeX = remember { mutableStateListOf<Float>() }
     val strokeY = remember { mutableStateListOf<Float>() }
 
+    // AUTO (mejorar foto) + histograma
+    var histBins by remember { mutableStateOf(IntArray(48)) }
+    var showAutoSnack by remember { mutableStateOf(false) }
+    var autoSnapshot by remember { mutableStateOf<List<Edit>?>(null) }
+
     val cropWorking = if (activeTool == EditorTool.CROP) (workingGeometry ?: geometry) else null
 
     fun effective(): app.revela.core.ColorMath.Adjustments {
@@ -264,6 +273,34 @@ fun EditorScreen() {
         workingAdj = null
         dragValue = Float.NaN
         persistSession()
+    }
+
+    /** AUTO de un toque: auto-niveles sobre la base; sustituye los ajustes tonales. */
+    fun runAuto() {
+        val b = base ?: return
+        scope.launch {
+            val r = withContext(Dispatchers.Default) { AutoLevels.compute(b) }
+            autoSnapshot = stack.edits
+            stack.removeTool(Tool.EXPOSURE)
+            stack.removeTool(Tool.CONTRAST)
+            stack.removeTool(Tool.SATURATION)
+            stack.removeTool(Tool.WHITE_BALANCE)
+            if (r.exposureStops != 0f) stack.apply(Edit.Exposure(r.exposureStops))
+            if (r.contrast != 0f) stack.apply(Edit.Contrast(r.contrast))
+            if (r.saturation != 0f) stack.apply(Edit.Saturation(r.saturation))
+            stackVersion++
+            persistSession()
+            showAutoSnack = true
+        }
+    }
+
+    /** Deshace el AUTO completo (vuelve al instante previo a la varita). */
+    fun undoAuto() {
+        autoSnapshot?.let { stack.reset(it) }
+        autoSnapshot = null
+        stackVersion++
+        persistSession()
+        showAutoSnack = false
     }
 
     /** Lista de edits efectiva (incluye el estado de trabajo del selectivo y la vineta). */
@@ -331,6 +368,39 @@ fun EditorScreen() {
         val q = geometry.quarterTurns
         launch(Dispatchers.Default) {
             lookThumbs = app.revela.render.ThumbRender.looks(b, stack, edits, q)
+        }
+    }
+
+    // Histograma del preview actual (48 tramos de luminancia)
+    LaunchedEffect(preview) {
+        val bmp = preview ?: return@LaunchedEffect
+        launch(Dispatchers.Default) {
+            val w = bmp.width
+            val h = bmp.height
+            val total = w * h
+            val px = IntArray(total)
+            bmp.getPixels(px, 0, w, 0, 0, w, h)
+            val stride = maxOf(1, total / 60000)
+            val bins = IntArray(48)
+            var i = 0
+            while (i < total) {
+                val p = px[i]
+                val r = (p shr 16) and 0xFF
+                val g = (p shr 8) and 0xFF
+                val b = p and 0xFF
+                val l = (r * 299 + g * 587 + b * 114) / 1000
+                bins[l * 48 / 256]++
+                i += stride
+            }
+            histBins = bins
+        }
+    }
+
+    // Autoapagado del snackbar de AUTO
+    LaunchedEffect(showAutoSnack) {
+        if (showAutoSnack) {
+            delay(4000)
+            showAutoSnack = false
         }
     }
 
@@ -1138,6 +1208,39 @@ fun EditorScreen() {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { runAuto() }, modifier = Modifier.size(44.dp)) {
+                        Icon(
+                            Icons.Filled.AutoFixHigh,
+                            contentDescription = "Auto",
+                            tint = Color.White
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    HistogramView(
+                        bins = histBins,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                    )
+                }
+                AnimatedVisibility(showAutoSnack) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Auto ajustado", color = Color.White, fontSize = 13.sp)
+                        Spacer(Modifier.weight(1f))
+                        TextButton(onClick = { undoAuto() }) { Text("Deshacer") }
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.Center
                 ) {
@@ -1899,6 +2002,25 @@ fun LooksCarousel(
                     color = if (sel) Color.White else Color.Gray,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+/** Histograma de luminancia (48 tramos) dibujado como barras blancas translucidas. */
+@Composable
+fun HistogramView(bins: IntArray, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val max = (bins.maxOrNull() ?: 1).coerceAtLeast(1)
+        val bw = size.width / bins.size
+        bins.forEachIndexed { i, v ->
+            val bh = (v.toFloat() / max) * size.height
+            if (bh > 0f) {
+                drawRect(
+                    Color.White.copy(alpha = 0.55f),
+                    topLeft = Offset(i * bw, size.height - bh),
+                    size = Size(kotlin.math.max(bw - 1f, 1f), bh)
                 )
             }
         }
