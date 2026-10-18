@@ -19,6 +19,7 @@ updated: "2026-10-18"
 
 ### Pending
 
+- [ ] Capturas del README desactualizadas (muestran la UI previa al rediseño Snapseed; rehacer 6 capturas + panel nuevo) <!-- added: 2026-10-18 -->
 - [x] Analisis REA de Snapseed completo (28 tools, medidas, gestos, flujos) <!-- done: 2026-10-18 -->
 - [ ] BUG: iconos invisibles en el OnePlus Open (release 0.1.0): en el emulador el MISMO APK los muestra bien (verificado 18-Oct); pide captura de pantalla al usuario o comparte pantalla; hipotesis: OxygenOS 16 + algo especifico del dispositivo, NO R8 <!-- added: 2026-10-18 -->
 - [ ] FASE 5 (en curso): panel Herramientas overlay animado slide-up ~250ms + scrim, foto SIEMPRE visible, tab bar persistente (patron Snapseed medido: panel hasta 68% inferior) <!-- added: 2026-10-18 -->
