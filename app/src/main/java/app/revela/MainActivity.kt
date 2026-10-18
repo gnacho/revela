@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,8 +47,26 @@ import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.RotateLeft
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.Healing
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Vignette
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -73,9 +92,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -83,7 +105,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -113,16 +137,24 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 enum class EditorTool(val id: String, val label: String) {
-    EXPOSURE(Tool.EXPOSURE, "Exposicion"),
-    CONTRAST(Tool.CONTRAST, "Contraste"),
-    SATURATION(Tool.SATURATION, "Saturacion"),
-    WHITE_BALANCE(Tool.WHITE_BALANCE, "Temperatura"),
+    TUNE("tune", "Ajustar"),
     CURVES(Tool.CURVES, "Curvas"),
     SELECTIVE(Tool.SELECTIVE, "Selectivo"),
     VIGNETTE(Tool.VIGNETTE, "Vineta"),
-    LOOKS(Tool.LOOK, "Estilos"),
     HEAL(Tool.HEAL, "Sanar"),
     CROP(Tool.CROP, "Recortar")
+}
+
+/** Pestañas inferiores estilo Snapseed. */
+enum class BottomTab { NONE, LOOKS, TOOLS }
+
+/** Parametros de la herramienta Ajustar (gesto vertical para elegir, horizontal para valor). */
+enum class TuneParam(val toolId: String, val wbParam: WbParam, val label: String) {
+    EXPOSURE(Tool.EXPOSURE, WbParam.TEMPERATURE, "Exposicion"),
+    CONTRAST(Tool.CONTRAST, WbParam.TEMPERATURE, "Contraste"),
+    SATURATION(Tool.SATURATION, WbParam.TEMPERATURE, "Saturacion"),
+    TEMPERATURE(Tool.WHITE_BALANCE, WbParam.TEMPERATURE, "Temperatura"),
+    TINT(Tool.WHITE_BALANCE, WbParam.TINT, "Tinte")
 }
 
 enum class SelParam(val label: String) {
@@ -157,7 +189,6 @@ fun EditorScreen() {
     var activeTool by remember { mutableStateOf<EditorTool?>(null) }
     var workingAdj by remember { mutableStateOf<app.revela.core.ColorMath.Adjustments?>(null) }
     var showOriginal by remember { mutableStateOf(false) }
-    var wbParam by remember { mutableStateOf(WbParam.TEMPERATURE) }
     var dragValue by remember { mutableFloatStateOf(Float.NaN) }
     var renderJob by remember { mutableStateOf<Job?>(null) }
     var workingGeometry by remember { mutableStateOf<GeometryModel?>(null) }
@@ -165,6 +196,14 @@ fun EditorScreen() {
     var cropDrawMode by remember { mutableStateOf(false) }
     var viewScale by remember { mutableFloatStateOf(1f) }
     var viewOffset by remember { mutableStateOf(Offset.Zero) }
+
+    // Navegacion estilo Snapseed
+    var bottomTab by remember { mutableStateOf(BottomTab.NONE) }
+    var tuneParam by remember { mutableStateOf(TuneParam.EXPOSURE) }
+    var paramMenuVisible by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var showRevertConfirm by remember { mutableStateOf(false) }
+    var lookThumbs by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
 
     // Selectivo
     var selParam by remember { mutableStateOf(SelParam.BRIGHTNESS) }
@@ -182,10 +221,14 @@ fun EditorScreen() {
     val cropWorking = if (activeTool == EditorTool.CROP) (workingGeometry ?: geometry) else null
 
     fun effective(): app.revela.core.ColorMath.Adjustments {
-        val tool = activeTool
+        val toolId = when (val t = activeTool) {
+            EditorTool.TUNE -> tuneParam.toolId
+            null -> ""
+            else -> t.id
+        }
         return EffectiveAdjustments.withWorking(
             EffectiveAdjustments.from(stack),
-            tool?.id ?: "",
+            toolId,
             workingAdj
         )
     }
@@ -195,9 +238,20 @@ fun EditorScreen() {
         SessionStore.save(context, u, stack, geometry)
     }
 
-    fun commitToolValue(value: Float) {
-        val tool = activeTool ?: return
-        val edit = EffectiveAdjustments.buildEdit(tool.id, effective(), wbParam, value) ?: return
+    /** Ajuste de trabajo para un parametro de Ajustar (WB conserva el campo no tocado). */
+    fun workingFor(tp: TuneParam, v: Float): app.revela.core.ColorMath.Adjustments {
+        val cur = EffectiveAdjustments.from(stack)
+        return when (tp) {
+            TuneParam.EXPOSURE -> cur.copy(exposureStops = v)
+            TuneParam.CONTRAST -> cur.copy(contrast = v)
+            TuneParam.SATURATION -> cur.copy(saturation = v)
+            TuneParam.TEMPERATURE -> cur.copy(temperature = v)
+            TuneParam.TINT -> cur.copy(tint = v)
+        }
+    }
+
+    fun commitParamValue(tp: TuneParam, value: Float) {
+        val edit = EffectiveAdjustments.buildEdit(tp.toolId, effective(), tp.wbParam, value) ?: return
         stack.apply(edit)
         stackVersion++
         workingAdj = null
@@ -250,14 +304,24 @@ fun EditorScreen() {
         }
     }
 
-    LaunchedEffect(base, stackVersion, workingAdj, workingPoint, workingVignette, activeTool, showOriginal, wbParam) {
+    LaunchedEffect(base, stackVersion, workingAdj, workingPoint, workingVignette, activeTool, showOriginal, tuneParam) {
         val b = base ?: return@LaunchedEffect
         renderJob?.cancel()
         val snapshotEdits = effectiveEdits()
         val quarter = geometry.quarterTurns
         renderJob = scope.launch(Dispatchers.Default) {
-            val bmp = PreviewRender.render(b, stack, quarter, showOriginal, snapshotEdits)
+            val bmp = PreviewRender.render(b, stack, quarter, showOriginal, snapshotEdits, effective())
             preview = bmp
+        }
+    }
+
+    // Miniaturas del carrusel de estilos (se regeneran al cambiar foto o pila)
+    LaunchedEffect(base, stackVersion) {
+        val b = base ?: return@LaunchedEffect
+        val edits = effectiveEdits()
+        val q = geometry.quarterTurns
+        launch(Dispatchers.Default) {
+            lookThumbs = app.revela.render.ThumbRender.looks(b, stack, edits, q)
         }
     }
 
@@ -314,14 +378,22 @@ fun EditorScreen() {
                         )
                     }
                 ) { Icon(Icons.Filled.Visibility, "Comparar con el original", tint = Color.White) }
-                IconButton(
-                    onClick = { activeTool = EditorTool.CROP },
-                    enabled = base != null
-                ) { Icon(Icons.Filled.RotateRight, "Recortar y rotar", tint = Color.White) }
-                IconButton(
-                    onClick = { showExportDialog = true },
-                    enabled = sourceUri != null
-                ) { Icon(Icons.Filled.Save, "Exportar", tint = Color.White) }
+                Box {
+                    IconButton(
+                        onClick = { showMenu = true },
+                        enabled = sourceUri != null
+                    ) { Icon(Icons.Filled.MoreVert, "Menu", tint = Color.White) }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Revertir todo") },
+                            onClick = {
+                                showMenu = false
+                                showRevertConfirm = true
+                            },
+                            enabled = stack.edits.isNotEmpty() || geometry != GeometryModel()
+                        )
+                    }
+                }
             } else {
                 IconButton(onClick = {
                     activeTool = null
@@ -360,41 +432,94 @@ fun EditorScreen() {
                 }) { Icon(Icons.Filled.Check, "Listo", tint = Color.White) }
             }
         }
-        // Valor en curso durante el gesto
+        // Indicador de valor fino estilo Snapseed (etiqueta + valor + linea con punto)
         val toolForValue = activeTool
-        if (toolForValue != null && showValueChip(toolForValue)) {
-            val shown = if (dragValue.isNaN()) {
-                when (toolForValue) {
-                    EditorTool.SELECTIVE -> {
-                        val pts = stack.selectivePoints()
-                        val wp = workingPoint
-                        val p = if (wp != null && activePoint in pts.indices) wp
-                        else pts.getOrNull(activePoint)
+        if (toolForValue == EditorTool.TUNE || toolForValue == EditorTool.SELECTIVE ||
+            toolForValue == EditorTool.VIGNETTE
+        ) {
+            val range: ClosedFloatingPointRange<Float>
+            val label: String
+            val shown: Float
+            when (toolForValue) {
+                EditorTool.TUNE -> {
+                    label = tuneParam.label
+                    range = EffectiveAdjustments.rangeFor(tuneParam.toolId)
+                    shown = if (dragValue.isNaN()) {
+                        EffectiveAdjustments.valueOf(effective(), tuneParam.toolId, tuneParam.wbParam)
+                    } else dragValue
+                }
+                EditorTool.SELECTIVE -> {
+                    label = selParam.label
+                    range = -1f..1f
+                    val pts = stack.selectivePoints()
+                    val wp = workingPoint
+                    val p = if (wp != null && activePoint in pts.indices) wp
+                    else pts.getOrNull(activePoint)
+                    shown = if (dragValue.isNaN()) {
                         when (selParam) {
                             SelParam.BRIGHTNESS -> p?.brightness ?: 0f
                             SelParam.CONTRAST -> p?.contrast ?: 0f
                             SelParam.SATURATION -> p?.saturation ?: 0f
                         }
-                    }
-                    EditorTool.VIGNETTE -> if (workingVignette.isNaN()) {
-                        (stack.edits.filterIsInstance<Edit.Vignette>().firstOrNull()?.strength ?: 0f)
-                    } else workingVignette
-                    else -> EffectiveAdjustments.valueOf(effective(), toolForValue.id, wbParam)
+                    } else dragValue
                 }
-            } else {
-                dragValue
+                else -> {
+                    label = "Viñeta"
+                    range = 0f..1f
+                    shown = if (workingVignette.isNaN()) {
+                        stack.edits.filterIsInstance<Edit.Vignette>().firstOrNull()?.strength ?: 0f
+                    } else workingVignette
+                }
             }
-            Text(
-                text = formatChipValue(toolForValue, shown),
-                color = Color.White,
-                fontSize = 22.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
+            val valueText = when (toolForValue) {
+                EditorTool.TUNE -> EffectiveAdjustments.formatValue(
+                    tuneParam.toolId, tuneParam.wbParam, shown
+                )
+                else -> {
+                    val pct = (shown * 100).toInt()
+                    (if (pct > 0) "+" else "") + "$pct"
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 40.dp, vertical = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(label, color = Color.Gray, fontSize = 11.sp)
+                    Text(valueText, color = Color.White, fontSize = 12.sp)
+                }
+                val span = range.endInclusive - range.start
+                val frac = if (span > 0) ((shown - range.start) / span).coerceIn(0f, 1f) else 0f
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(12.dp)
+                ) {
+                    val y = size.height / 2
+                    drawLine(
+                        Color(0x33FFFFFF), Offset(0f, y), Offset(size.width, y),
+                        strokeWidth = 3f, cap = StrokeCap.Round
+                    )
+                    drawCircle(Color.White, radius = 5f, center = Offset(size.width * frac, y))
+                }
+            }
         }
-
-        // Ventana de imagen
-        BoxWithConstraints(
+        // Ventana de imagen (o rejilla de herramientas a pantalla completa)
+        if (activeTool == null && bottomTab == BottomTab.TOOLS) {
+            ToolsGrid(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                onSelect = {
+                    activeTool = it
+                    bottomTab = BottomTab.NONE
+                }
+            )
+        } else BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -669,36 +794,95 @@ fun EditorScreen() {
                             }
                         }
 
-                        // Herramientas de valor (exposicion, contraste, saturacion, WB):
-                        // arrastre horizontal sobre la foto ajusta el valor.
-                        EditorTool.EXPOSURE, EditorTool.CONTRAST,
-                        EditorTool.SATURATION, EditorTool.WHITE_BALANCE -> {
+                        // Ajustar (estilo Snapseed): arrastre vertical = elegir parametro,
+                        // arrastre horizontal = ajustar el valor del parametro activo.
+                        EditorTool.TUNE -> {
+                            val haptics = LocalHapticFeedback.current
                             Box(
                                 modifier = Modifier
                                     .matchParentSize()
-                                    .pointerInput(toolNow.id, wbParam) {
-                                        val range = EffectiveAdjustments.rangeFor(toolNow.id)
-                                        var start = 0f
-                                        detectHorizontalDragGestures(
+                                    .pointerInput(Unit) {
+                                        var totalX = 0f
+                                        var totalY = 0f
+                                        var mode = 0 // 0 sin decidir, 1 vertical (param), 2 horizontal (valor)
+                                        var startValue = 0f
+                                        var paramAtStart = TuneParam.EXPOSURE
+                                        detectDragGestures(
                                             onDragStart = {
-                                                start = EffectiveAdjustments.valueOf(
-                                                    effective(), toolNow.id, wbParam
+                                                totalX = 0f
+                                                totalY = 0f
+                                                mode = 0
+                                                paramAtStart = tuneParam
+                                                startValue = EffectiveAdjustments.valueOf(
+                                                    effective(), tuneParam.toolId, tuneParam.wbParam
                                                 )
                                             },
-                                            onDragEnd = {
-                                                if (!dragValue.isNaN()) commitToolValue(dragValue)
+                                            onDrag = { change, amount ->
+                                                change.consume()
+                                                totalX += amount.x
+                                                totalY += amount.y
+                                                if (mode == 0 && (abs(totalX) > 28f || abs(totalY) > 28f)) {
+                                                    mode = if (abs(totalY) > abs(totalX)) 1 else 2
+                                                    if (mode == 1) paramMenuVisible = true
+                                                }
+                                                when (mode) {
+                                                    1 -> {
+                                                        val step = (totalY / 110f).toInt()
+                                                        val entries = TuneParam.entries
+                                                        val idx = (paramAtStart.ordinal + step)
+                                                            .coerceIn(0, entries.size - 1)
+                                                        if (entries[idx] != tuneParam) {
+                                                            tuneParam = entries[idx]
+                                                            dragValue = Float.NaN
+                                                            haptics.performHapticFeedback(
+                                                                HapticFeedbackType.TextHandleMove
+                                                            )
+                                                        }
+                                                    }
+                                                    2 -> {
+                                                        val tp = tuneParam
+                                                        val range = EffectiveAdjustments.rangeFor(tp.toolId)
+                                                        val span = range.endInclusive - range.start
+                                                        if (dragValue.isNaN()) dragValue = startValue
+                                                        dragValue = (dragValue + amount.x / (viewportWpx * 1.8f) * span)
+                                                            .coerceIn(range.start, range.endInclusive)
+                                                        workingAdj = workingFor(tp, dragValue)
+                                                    }
+                                                }
                                             },
-                                            onDragCancel = { dragValue = Float.NaN }
-                                        ) { change, dragAmount ->
-                                            change.consume()
-                                            val span = range.endInclusive - range.start
-                                            if (dragValue.isNaN()) dragValue = start
-                                            dragValue = (dragValue + dragAmount / (viewportWpx * 1.8f) * span)
-                                                .coerceIn(range.start, range.endInclusive)
-                                            workingAdj = makeWorking(toolNow.id, wbParam, dragValue)
-                                        }
+                                            onDragEnd = {
+                                                paramMenuVisible = false
+                                                if (mode == 2 && !dragValue.isNaN()) {
+                                                    commitParamValue(tuneParam, dragValue)
+                                                }
+                                                mode = 0
+                                            },
+                                            onDragCancel = {
+                                                paramMenuVisible = false
+                                                workingAdj = null
+                                                dragValue = Float.NaN
+                                                mode = 0
+                                            }
+                                        )
                                     }
                             )
+                            if (paramMenuVisible) {
+                                Column(
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .background(Color(0xCC101014), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    TuneParam.entries.forEach { p ->
+                                        Text(
+                                            p.label,
+                                            color = if (p == tuneParam) Color.White else Color.Gray,
+                                            fontSize = if (p == tuneParam) 16.sp else 13.sp,
+                                            modifier = Modifier.padding(vertical = 6.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
 
                         else -> {}
@@ -709,14 +893,31 @@ fun EditorScreen() {
 
         // Paneles inferiores
         when (activeTool) {
-            null -> ToolRail(
+            null -> Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(Color(0xFF101014))
                     .navigationBarsPadding()
-                    .padding(vertical = 8.dp),
-                enabled = base != null,
-                onSelect = { activeTool = it }
-            )
+            ) {
+                if (bottomTab == BottomTab.LOOKS && base != null) {
+                    LooksCarousel(
+                        thumbs = lookThumbs,
+                        selectedId = stack.edits.filterIsInstance<Edit.Look>().lastOrNull()?.id ?: "none",
+                        onSelect = { look ->
+                            if (look.id == "none") stack.removeTool(Tool.LOOK)
+                            else stack.apply(Edit.Look(look.id))
+                            stackVersion++
+                            persistSession()
+                        }
+                    )
+                }
+                BottomTabs(
+                    selected = bottomTab,
+                    enabled = base != null,
+                    onSelect = { bottomTab = it },
+                    onExport = { showExportDialog = true }
+                )
+            }
 
             EditorTool.CURVES -> CurvesPanel(
                 current = EffectiveAdjustments.from(stack).curve
@@ -809,29 +1010,6 @@ fun EditorScreen() {
                 }
             }
 
-            EditorTool.LOOKS -> Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .background(Color(0xFF101014))
-                    .navigationBarsPadding()
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Look.entries.forEach { look ->
-                    FilterChip(
-                        selected = stack.edits.filterIsInstance<Edit.Look>()
-                            .firstOrNull()?.id == look.id,
-                        onClick = {
-                            stack.apply(Edit.Look(look.id))
-                            stackVersion++
-                            persistSession()
-                        },
-                        label = { Text(look.label, fontSize = 12.sp) }
-                    )
-                }
-            }
-
             EditorTool.HEAL -> Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -911,7 +1089,7 @@ fun EditorScreen() {
                 )
             }
 
-            EditorTool.WHITE_BALANCE -> Column(
+            EditorTool.TUNE -> Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFF101014))
@@ -919,41 +1097,55 @@ fun EditorScreen() {
                     .padding(vertical = 8.dp)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    FilterChip(
-                        selected = wbParam == WbParam.TEMPERATURE,
-                        onClick = { wbParam = WbParam.TEMPERATURE; dragValue = Float.NaN },
-                        label = { Text("Temperatura") }
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    FilterChip(
-                        selected = wbParam == WbParam.TINT,
-                        onClick = { wbParam = WbParam.TINT; dragValue = Float.NaN },
-                        label = { Text("Tinte") }
-                    )
+                    TuneParam.entries.forEach { p ->
+                        FilterChip(
+                            selected = tuneParam == p,
+                            onClick = {
+                                tuneParam = p
+                                dragValue = Float.NaN
+                            },
+                            label = { Text(p.label, fontSize = 12.sp) },
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    }
                 }
                 Text(
-                    "Desliza horizontalmente sobre la foto",
+                    "Arrastra en vertical para elegir parametro - en horizontal para ajustar",
                     color = Color.Gray,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
-            else -> Text(
-                "Desliza horizontalmente sobre la foto",
-                color = Color.Gray,
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(bottom = 12.dp)
-            )
+            else -> {}
+
         }
+    }
+
+    if (showRevertConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRevertConfirm = false },
+            title = { Text("Revertir todo") },
+            text = { Text("Se eliminaran todas las ediciones de esta foto.") },
+            confirmButton = {
+                Button(onClick = {
+                    stack = EditStack()
+                    geometry = GeometryModel()
+                    stackVersion++
+                    persistSession()
+                    showRevertConfirm = false
+                }) { Text("Revertir") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showRevertConfirm = false }) { Text("Cancelar") }
+            }
+        )
     }
 
     if (sourceUri != null && showExportDialog) {
@@ -980,40 +1172,6 @@ fun EditorScreen() {
     }
 }
 
-private fun showValueChip(tool: EditorTool): Boolean = when (tool) {
-    EditorTool.CROP, EditorTool.CURVES, EditorTool.LOOKS, EditorTool.HEAL -> false
-    else -> true
-}
-
-private fun formatChipValue(tool: EditorTool, value: Float): String = when (tool) {
-    EditorTool.EXPOSURE -> {
-        val stops = (value * 10).toInt() / 10f
-        (if (stops > 0) "+" else "") + "$stops EV"
-    }
-    EditorTool.VIGNETTE -> "${(value * 100).toInt()}%"
-    else -> {
-        val pct = (value * 100).toInt()
-        (if (pct > 0) "+" else "") + "$pct"
-    }
-}
-
-private fun makeWorking(
-    toolId: String,
-    wbParam: WbParam,
-    value: Float
-): app.revela.core.ColorMath.Adjustments {
-    val base = app.revela.core.ColorMath.Adjustments()
-    return when (toolId) {
-        Tool.EXPOSURE -> base.copy(exposureStops = value)
-        Tool.CONTRAST -> base.copy(contrast = value)
-        Tool.SATURATION -> base.copy(saturation = value)
-        Tool.WHITE_BALANCE ->
-            if (wbParam == WbParam.TEMPERATURE) base.copy(temperature = value)
-            else base.copy(tint = value)
-        else -> base
-    }
-}
-
 /** Factor de escala para que el contenido girado cubra siempre la ventana (formula exacta de cover). */
 fun coverScale(angleDeg: Float, contentAspect: Float): Float {
     val rad = Math.toRadians(angleDeg.toDouble())
@@ -1022,24 +1180,6 @@ fun coverScale(angleDeg: Float, contentAspect: Float): Float {
     val w = contentAspect
     val h = 1f
     return max((w * c + h * s) / w, (w * s + h * c) / h)
-}
-
-@Composable
-fun ToolRail(modifier: Modifier = Modifier, enabled: Boolean, onSelect: (EditorTool) -> Unit) {
-    Row(
-        modifier = modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        EditorTool.entries.forEach { tool ->
-            OutlinedButton(
-                onClick = { onSelect(tool) },
-                enabled = enabled,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(tool.label, fontSize = 11.sp, maxLines = 1, softWrap = false)
-            }
-        }
-    }
 }
 
 @Composable
@@ -1575,4 +1715,145 @@ fun ExportDialog(
             OutlinedButton(onClick = onDismiss) { Text("Cancelar") }
         }
     )
+}
+
+/** Barra inferior de 3 pestañas estilo Snapseed: Estilos | Herramientas | Exportar. */
+@Composable
+fun BottomTabs(
+    selected: BottomTab,
+    enabled: Boolean,
+    onSelect: (BottomTab) -> Unit,
+    onExport: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TabButton(
+            "Estilos", selected == BottomTab.LOOKS, enabled, Modifier.weight(1f)
+        ) { onSelect(if (selected == BottomTab.LOOKS) BottomTab.NONE else BottomTab.LOOKS) }
+        TabButton(
+            "Herramientas", selected == BottomTab.TOOLS, enabled, Modifier.weight(1f)
+        ) { onSelect(if (selected == BottomTab.TOOLS) BottomTab.NONE else BottomTab.TOOLS) }
+        TabButton("Exportar", false, enabled, Modifier.weight(1f)) { onExport() }
+    }
+}
+
+@Composable
+fun TabButton(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    TextButton(onClick = onClick, modifier = modifier, enabled = enabled) {
+        Text(
+            label,
+            color = if (selected) Color.White else Color(0xFF9E9E9E),
+            fontSize = 14.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+        )
+    }
+}
+
+/** Rejilla de herramientas a pantalla completa (estilo Snapseed). */
+@Composable
+fun ToolsGrid(modifier: Modifier = Modifier, onSelect: (EditorTool) -> Unit) {
+    val tools = listOf(
+        Triple(EditorTool.TUNE, Icons.Filled.Tune, "Ajustar"),
+        Triple(EditorTool.CURVES, Icons.Filled.ShowChart, "Curvas"),
+        Triple(EditorTool.CROP, Icons.Filled.Crop, "Recortar"),
+        Triple(EditorTool.SELECTIVE, Icons.Filled.CenterFocusStrong, "Selectivo"),
+        Triple(EditorTool.HEAL, Icons.Filled.Healing, "Sanar"),
+        Triple(EditorTool.VIGNETTE, Icons.Filled.Vignette, "Viñeta")
+    )
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = modifier
+            .background(Color.Black)
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(tools) { (tool, icon, label) ->
+            Card(
+                onClick = { onSelect(tool) },
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF16161C))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(icon, label, tint = Color.White)
+                    Text(
+                        label,
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Carrusel de estilos con miniaturas de la foto real filtrada en vivo. */
+@Composable
+fun LooksCarousel(
+    thumbs: Map<String, ImageBitmap>,
+    selectedId: String,
+    onSelect: (Look) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Look.entries.forEach { look ->
+            val sel = look.id == selectedId
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onSelect(look) }
+                    .padding(4.dp)
+            ) {
+                val th = thumbs[look.id]
+                if (th != null) {
+                    Image(
+                        bitmap = th,
+                        contentDescription = look.label,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(
+                                width = if (sel) 2.dp else 1.dp,
+                                color = if (sel) Color.White else Color(0xFF333340),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .background(Color(0xFF1A1A20), RoundedCornerShape(8.dp))
+                    )
+                }
+                Text(
+                    look.label,
+                    color = if (sel) Color.White else Color.Gray,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+    }
 }

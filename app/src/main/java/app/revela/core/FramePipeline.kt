@@ -15,7 +15,8 @@ object FramePipeline {
         h: Int,
         stack: EditStack,
         edits: List<Edit> = stack.edits,
-        identity: Boolean = false
+        identity: Boolean = false,
+        adjOverride: ColorMath.Adjustments? = null
     ) {
         if (identity) return
 
@@ -27,8 +28,8 @@ object FramePipeline {
             }
         }
 
-        // 2) color global
-        val adj = EffectiveAdjustments.from(stack)
+        // 2) color global (desde la lista de edits pasada, o del override en vivo)
+        val adj = adjOverride ?: EffectiveAdjustments.fromEdits(edits)
         ColorMath.applyInPlace(pixels, ColorMath.buildLuts(adj), adj.saturation)
 
         // 3) selectivo + 4) vineta

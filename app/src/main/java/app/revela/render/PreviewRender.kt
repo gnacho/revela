@@ -69,12 +69,13 @@ object PreviewRender {
         stack: EditStack,
         quarterTurns: Int,
         identity: Boolean,
-        edits: List<Edit> = stack.edits
+        edits: List<Edit> = stack.edits,
+        adjOverride: app.revela.core.ColorMath.Adjustments? = null
     ): Bitmap = withContext(Dispatchers.Default) {
         if (identity) return@withContext base.toBitmap()
         val t0 = android.os.SystemClock.elapsedRealtime()
         val (frame, fw, fh) = FrameMath.rotateQuarter(base.pixels, base.width, base.height, quarterTurns)
-        FramePipeline.apply(frame, fw, fh, stack, edits)
+        FramePipeline.apply(frame, fw, fh, stack, edits, adjOverride = adjOverride)
         val bmp = Bitmap.createBitmap(frame, fw, fh, Bitmap.Config.ARGB_8888)
         android.util.Log.i(
             "revela",

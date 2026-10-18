@@ -5,9 +5,11 @@ import app.revela.core.Look
 /** Plega la pila de edits en ajustes globales efectivos (la ultima entrada de cada herramienta gana). */
 object EffectiveAdjustments {
 
-    fun from(stack: EditStack): ColorMath.Adjustments {
+    fun from(stack: EditStack): ColorMath.Adjustments = fromEdits(stack.edits)
+
+    fun fromEdits(edits: List<Edit>): ColorMath.Adjustments {
         var a = ColorMath.Adjustments()
-        for (edit in stack.edits) {
+        for (edit in edits) {
             a = when (edit) {
                 is Edit.Exposure -> a.copy(exposureStops = edit.stops)
                 is Edit.Contrast -> a.copy(contrast = edit.amount)
