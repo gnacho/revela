@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -67,6 +68,21 @@ import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.Tonality
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Contrast
+import androidx.compose.material.icons.filled.CropFree
+import androidx.compose.material.icons.filled.Details
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Flare
+import androidx.compose.material.icons.filled.Grain
+import androidx.compose.material.icons.filled.HdrStrong
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Texture
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -143,6 +159,7 @@ import app.revela.core.AutoLevels
 import app.revela.core.CustomStyle
 import app.revela.core.WbParam
 import app.revela.core.WelcomeStore
+import app.revela.core.Presets
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
@@ -164,7 +181,34 @@ enum class EditorTool(val id: String, val label: String) {
     CROP(Tool.CROP, "Recortar"),
     ROTATE("rotate", "Girar"),
     BNW(Tool.BNW, "Blanco y negro"),
-    WB(Tool.WHITE_BALANCE, "Balance blancos")
+    WB(Tool.WHITE_BALANCE, "Balance blancos"),
+    DETAILS(Tool.DETAILS, "Detalles"),
+    HDR(Tool.HDR, "HDR-scape"),
+    GRAIN(Tool.GRAIN, "Grano"),
+    GLOW(Tool.GLOW, "Brillo glamuroso"),
+    LENS_BLUR(Tool.LENS_BLUR, "Desenfoque"),
+    DRAMA("drama", "Drama"),
+    VINTAGE("vintage", "Vintage"),
+    GRAINY_FILM("grainyFilm", "Pelicula granulada"),
+    RETROLUX("retrolux", "Retrolux"),
+    GRUNGE("grunge", "Grunge"),
+    NOIR("noir", "Noir"),
+    PORTRAIT("portrait", "Retrato"),
+    DOUBLE_EXPO(Tool.DOUBLE_EXPO, "Doble exposicion"),
+    TEXT(Tool.TEXT, "Texto"),
+    FRAME(Tool.FRAME, "Marcos")
+}
+
+/** Receta de preset asociada a una herramienta (solo las 7 de preset). */
+fun EditorTool.presetKind(): Presets.Kind? = when (this) {
+    EditorTool.DRAMA -> Presets.Kind.DRAMA
+    EditorTool.VINTAGE -> Presets.Kind.VINTAGE
+    EditorTool.GRAINY_FILM -> Presets.Kind.GRAINY_FILM
+    EditorTool.RETROLUX -> Presets.Kind.RETROLUX
+    EditorTool.GRUNGE -> Presets.Kind.GRUNGE
+    EditorTool.NOIR -> Presets.Kind.NOIR
+    EditorTool.PORTRAIT -> Presets.Kind.PORTRAIT
+    else -> null
 }
 
 /** Pestañas inferiores estilo Snapseed. */
@@ -258,6 +302,13 @@ fun EditorScreen() {
     var showAutoSnack by remember { mutableStateOf(false) }
     var autoSnapshot by remember { mutableStateOf<List<Edit>?>(null) }
 
+    // Herramientas nuevas: estado de trabajo generico (un solo edit) + intensidad de preset
+    var workingEdit by remember { mutableStateOf<Edit?>(null) }
+    var workingPresetIntensity by remember { mutableFloatStateOf(Float.NaN) }
+
+    // Doble exposicion: 2a imagen (sesion volatil; no se persiste en SessionStore para no tocarlo)
+    var overlayImage by remember { mutableStateOf<BaseImage?>(null) }
+
     val cropWorking = if (activeTool == EditorTool.CROP) (workingGeometry ?: geometry) else null
 
     fun effective(): app.revela.core.ColorMath.Adjustments {
@@ -341,6 +392,15 @@ fun EditorScreen() {
         if (activeTool == EditorTool.VIGNETTE && !workingVignette.isNaN()) {
             list = list.filterNot { it is Edit.Vignette } + Edit.Vignette(workingVignette)
         }
+        if (workingEdit != null) {
+            val we = workingEdit!!
+            list = list.filterNot { it.toolId == we.toolId } + we
+        }
+        val pk = activeTool?.presetKind()
+        if (pk != null && !workingPresetIntensity.isNaN()) {
+            val toolIds = pk.toolIds()
+            list = list.filterNot { it.toolId in toolIds } + pk.edits(workingPresetIntensity)
+        }
         return list
     }
 
@@ -362,6 +422,22 @@ fun EditorScreen() {
         stack.apply(Edit.TonalContrast(cur.tonalShadows, cur.tonalMidtones, cur.tonalHighlights))
         stackVersion++
         workingAdj = null
+        persistSession()
+    }
+
+    /** Compromete el edit en curso de las herramientas espaciales/de composicion. */
+    fun commitWorkingEdit(edit: Edit) {
+        stack.apply(edit)
+        stackVersion++
+        workingEdit = null
+        persistSession()
+    }
+
+    /** Restablece una herramienta espacial (quita su edit de la pila). */
+    fun resetTool(toolId: String) {
+        stack.removeTool(toolId)
+        stackVersion++
+        workingEdit = null
         persistSession()
     }
 
@@ -388,6 +464,9 @@ fun EditorScreen() {
                 activePoint = -1
                 strokeX.clear()
                 strokeY.clear()
+                workingEdit = null
+                workingPresetIntensity = Float.NaN
+                overlayImage = null
                 val restored = loaded?.let { SessionStore.load(context, uri) }
                 stack = restored?.first ?: EditStack()
                 geometry = restored?.second ?: GeometryModel()
@@ -396,13 +475,25 @@ fun EditorScreen() {
         }
     }
 
-    LaunchedEffect(base, stackVersion, workingAdj, workingPoint, workingVignette, activeTool, showOriginal, tuneParam) {
+    // Selector de la 2a imagen para doble exposicion
+    val overlayPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                val loaded = PreviewRender.decode(context.contentResolver, uri)
+                if (loaded != null) overlayImage = loaded
+            }
+        }
+    }
+
+    LaunchedEffect(base, stackVersion, workingAdj, workingPoint, workingVignette, activeTool, showOriginal, tuneParam, workingEdit, workingPresetIntensity, overlayImage) {
         val b = base ?: return@LaunchedEffect
         renderJob?.cancel()
         val snapshotEdits = effectiveEdits()
         val quarter = geometry.quarterTurns
         renderJob = scope.launch(Dispatchers.Default) {
-            val bmp = PreviewRender.render(b, stack, quarter, showOriginal, snapshotEdits, effective())
+            val bmp = PreviewRender.render(b, stack, quarter, showOriginal, snapshotEdits, effective(), overlayImage)
             preview = bmp
         }
     }
@@ -546,6 +637,8 @@ fun EditorScreen() {
                     workingVignette = Float.NaN
                     strokeX.clear()
                     strokeY.clear()
+                    workingEdit = null
+                    workingPresetIntensity = Float.NaN
                 }) { Icon(Icons.Filled.Close, "Cerrar herramienta", tint = Color.White) }
                 IconButton(onClick = {
                     when (activeTool) {
@@ -570,6 +663,8 @@ fun EditorScreen() {
                     workingPoint = null
                     activePoint = -1
                     activeTool = null
+                    workingEdit = null
+                    workingPresetIntensity = Float.NaN
                 }) { Icon(Icons.Filled.Check, "Listo", tint = Color.White) }
             }
         }
@@ -1488,6 +1583,277 @@ fun EditorScreen() {
                                     }
                                 }
 
+                                EditorTool.DETAILS -> {
+                                    val cur = (workingEdit as? Edit.Details)
+                                        ?: stack.edits.filterIsInstance<Edit.Details>().firstOrNull()
+                                        ?: Edit.Details()
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFF101014))
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        TonalSlider("Estructura", cur.structure) { v ->
+                                            workingEdit = cur.copy(structure = v)
+                                        }
+                                        TonalSlider("Enfoque", cur.sharpening) { v ->
+                                            workingEdit = cur.copy(sharpening = v)
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            OutlinedButton(onClick = { resetTool(Tool.DETAILS) }) { Text("Restablecer") }
+                                            Button(onClick = {
+                                                commitWorkingEdit(workingEdit as? Edit.Details ?: cur)
+                                                activeTool = null
+                                            }) { Text("Aplicar") }
+                                        }
+                                    }
+                                }
+
+                                EditorTool.HDR -> {
+                                    val cur = (workingEdit as? Edit.Hdr)?.strength
+                                        ?: stack.edits.filterIsInstance<Edit.Hdr>().firstOrNull()?.strength ?: 0f
+                                    StrengthPanel(
+                                        label = "Intensidad",
+                                        value = cur,
+                                        onValueChange = { workingEdit = Edit.Hdr(it) },
+                                        onReset = { resetTool(Tool.HDR) },
+                                        onApply = { commitWorkingEdit(Edit.Hdr(cur)); activeTool = null }
+                                    )
+                                }
+
+                                EditorTool.GRAIN -> {
+                                    val cur = (workingEdit as? Edit.Grain)?.strength
+                                        ?: stack.edits.filterIsInstance<Edit.Grain>().firstOrNull()?.strength ?: 0f
+                                    StrengthPanel(
+                                        label = "Intensidad",
+                                        value = cur,
+                                        onValueChange = { workingEdit = Edit.Grain(it) },
+                                        onReset = { resetTool(Tool.GRAIN) },
+                                        onApply = { commitWorkingEdit(Edit.Grain(cur)); activeTool = null }
+                                    )
+                                }
+
+                                EditorTool.GLOW -> {
+                                    val cur = (workingEdit as? Edit.Glow)?.strength
+                                        ?: stack.edits.filterIsInstance<Edit.Glow>().firstOrNull()?.strength ?: 0f
+                                    StrengthPanel(
+                                        label = "Intensidad",
+                                        value = cur,
+                                        onValueChange = { workingEdit = Edit.Glow(it) },
+                                        onReset = { resetTool(Tool.GLOW) },
+                                        onApply = { commitWorkingEdit(Edit.Glow(cur)); activeTool = null }
+                                    )
+                                }
+
+                                EditorTool.LENS_BLUR -> {
+                                    val cur = (workingEdit as? Edit.LensBlur)?.strength
+                                        ?: stack.edits.filterIsInstance<Edit.LensBlur>().firstOrNull()?.strength ?: 0f
+                                    StrengthPanel(
+                                        label = "Intensidad",
+                                        value = cur,
+                                        onValueChange = { workingEdit = Edit.LensBlur(it) },
+                                        onReset = { resetTool(Tool.LENS_BLUR) },
+                                        onApply = { commitWorkingEdit(Edit.LensBlur(cur)); activeTool = null }
+                                    )
+                                }
+
+                                EditorTool.DRAMA, EditorTool.VINTAGE, EditorTool.GRAINY_FILM, EditorTool.RETROLUX,
+                                EditorTool.GRUNGE, EditorTool.NOIR, EditorTool.PORTRAIT -> {
+                                    val kind = activeTool?.presetKind()
+                                    if (kind != null) {
+                                        val current = if (workingPresetIntensity.isNaN()) 0f else workingPresetIntensity
+                                        StrengthPanel(
+                                            label = kind.label,
+                                            value = current,
+                                            onValueChange = { workingPresetIntensity = it },
+                                            onReset = {
+                                                workingPresetIntensity = Float.NaN
+                                                kind.toolIds().forEach { stack.removeTool(it) }
+                                                stackVersion++
+                                                persistSession()
+                                            },
+                                            onApply = {
+                                                val t = if (workingPresetIntensity.isNaN()) current else workingPresetIntensity
+                                                kind.edits(t).forEach { stack.apply(it) }
+                                                stackVersion++
+                                                workingPresetIntensity = Float.NaN
+                                                persistSession()
+                                                activeTool = null
+                                            }
+                                        )
+                                    }
+                                }
+
+                                EditorTool.DOUBLE_EXPO -> {
+                                    val cur = (workingEdit as? Edit.DoubleExpo)
+                                        ?: stack.edits.filterIsInstance<Edit.DoubleExpo>().firstOrNull()
+                                        ?: Edit.DoubleExpo()
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFF101014))
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState()),
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            listOf(
+                                                "normal" to "Normal",
+                                                "screen" to "Pantalla",
+                                                "multiply" to "Multiplicar",
+                                                "lighten" to "Aclarar",
+                                                "darken" to "Oscurecer"
+                                            ).forEach { (id, label) ->
+                                                FilterChip(
+                                                    selected = cur.blend == id,
+                                                    onClick = { workingEdit = cur.copy(blend = id) },
+                                                    label = { Text(label, fontSize = 12.sp) },
+                                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                                )
+                                            }
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            OutlinedButton(onClick = {
+                                                overlayPickerLauncher.launch(
+                                                    PickVisualMediaRequest(
+                                                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                                                    )
+                                                )
+                                            }) { Text("2a foto") }
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                if (overlayImage != null) "Cargada" else "Sin imagen",
+                                                color = Color.Gray,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                        Text("Opacidad: ${(cur.opacity * 100).toInt()}%", color = Color.White, fontSize = 13.sp)
+                                        Slider(
+                                            value = cur.opacity,
+                                            onValueChange = { workingEdit = cur.copy(opacity = it) },
+                                            valueRange = 0f..1f
+                                        )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            OutlinedButton(onClick = {
+                                                resetTool(Tool.DOUBLE_EXPO)
+                                                overlayImage = null
+                                            }) { Text("Restablecer") }
+                                            Button(onClick = {
+                                                commitWorkingEdit(workingEdit as? Edit.DoubleExpo ?: cur)
+                                                activeTool = null
+                                            }) { Text("Aplicar") }
+                                        }
+                                    }
+                                }
+
+                                EditorTool.TEXT -> {
+                                    val cur = (workingEdit as? Edit.TextOverlay)
+                                        ?: stack.edits.filterIsInstance<Edit.TextOverlay>().firstOrNull()
+                                        ?: Edit.TextOverlay()
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFF101014))
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = cur.content,
+                                            onValueChange = { workingEdit = cur.copy(content = it) },
+                                            label = { Text("Texto") },
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState()),
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            textColorChips.forEach { (label, colorInt) ->
+                                                FilterChip(
+                                                    selected = cur.colorInt == colorInt,
+                                                    onClick = { workingEdit = cur.copy(colorInt = colorInt) },
+                                                    label = { Text(label, fontSize = 12.sp) },
+                                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                                )
+                                            }
+                                        }
+                                        Text("Tamano: ${(cur.sizePct * 100).toInt()}%", color = Color.White, fontSize = 13.sp)
+                                        Slider(
+                                            value = cur.sizePct,
+                                            onValueChange = { workingEdit = cur.copy(sizePct = it) },
+                                            valueRange = 0.02f..0.5f
+                                        )
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState()),
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            listOf("top" to "Arriba", "center" to "Centro", "bottom" to "Abajo")
+                                                .forEach { (id, label) ->
+                                                    FilterChip(
+                                                        selected = cur.gravity == id,
+                                                        onClick = { workingEdit = cur.copy(gravity = id) },
+                                                        label = { Text(label, fontSize = 12.sp) },
+                                                        modifier = Modifier.padding(horizontal = 4.dp)
+                                                    )
+                                                }
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            OutlinedButton(onClick = { resetTool(Tool.TEXT) }) { Text("Restablecer") }
+                                            Button(onClick = {
+                                                commitWorkingEdit(workingEdit as? Edit.TextOverlay ?: cur)
+                                                activeTool = null
+                                            }) { Text("Aplicar") }
+                                        }
+                                    }
+                                }
+
+                                EditorTool.FRAME -> {
+                                    val cur = (workingEdit as? Edit.Frame)
+                                        ?: stack.edits.filterIsInstance<Edit.Frame>().firstOrNull()
+                                        ?: Edit.Frame()
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFF101014))
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState()),
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            textColorChips.forEach { (label, colorInt) ->
+                                                FilterChip(
+                                                    selected = cur.colorInt == colorInt,
+                                                    onClick = { workingEdit = cur.copy(colorInt = colorInt) },
+                                                    label = { Text(label, fontSize = 12.sp) },
+                                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                                )
+                                            }
+                                        }
+                                        Text("Grosor: ${(cur.widthPct * 100).toInt()}%", color = Color.White, fontSize = 13.sp)
+                                        Slider(
+                                            value = cur.widthPct,
+                                            onValueChange = { workingEdit = cur.copy(widthPct = it) },
+                                            valueRange = 0.01f..0.25f
+                                        )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            OutlinedButton(onClick = { resetTool(Tool.FRAME) }) { Text("Restablecer") }
+                                            Button(onClick = {
+                                                commitWorkingEdit(workingEdit as? Edit.Frame ?: cur)
+                                                activeTool = null
+                                            }) { Text("Aplicar") }
+                                        }
+                                    }
+                                }
+
                                 else -> {}
 
                             }
@@ -1607,7 +1973,7 @@ fun EditorScreen() {
                 showExportDialog = false
                 scope.launch {
                     val result = ExportProcessor.export(
-                        context, sourceUri!!, stack, geometry, options
+                        context, sourceUri!!, stack, geometry, options, overlayImage
                     )
                     result.onFailure {
                         android.util.Log.e("revela", "export fallo", it)
@@ -2217,52 +2583,73 @@ fun TabButton(
 fun ToolsGrid(modifier: Modifier = Modifier, onSelect: (EditorTool) -> Unit) {
     val tools = listOf(
         Triple(EditorTool.TUNE, Icons.Filled.Tune, "Ajustar imagen"),
+        Triple(EditorTool.DETAILS, Icons.Filled.Details, "Detalles"),
         Triple(EditorTool.CURVES, Icons.Filled.ShowChart, "Curvas"),
+        Triple(EditorTool.WB, Icons.Filled.WbSunny, "Balance blancos"),
         Triple(EditorTool.TONE, Icons.Filled.Tonality, "Contraste tonal"),
-        Triple(EditorTool.SELECTIVE, Icons.Filled.CenterFocusStrong, "Selectivo"),
-        Triple(EditorTool.HEAL, Icons.Filled.Healing, "Quitamanchas"),
-        Triple(EditorTool.VIGNETTE, Icons.Filled.Vignette, "Viñeta"),
         Triple(EditorTool.CROP, Icons.Filled.Crop, "Recortar"),
         Triple(EditorTool.ROTATE, Icons.Filled.RotateRight, "Girar"),
-        Triple(EditorTool.BNW, Icons.Filled.FilterBAndW, "Blanco y negro"),
-        Triple(EditorTool.WB, Icons.Filled.WbSunny, "Balance blancos")
+        Triple(EditorTool.SELECTIVE, Icons.Filled.CenterFocusStrong, "Selectivo"),
+        Triple(EditorTool.HEAL, Icons.Filled.Healing, "Quitamanchas"),
+        Triple(EditorTool.GLOW, Icons.Filled.AutoAwesome, "Brillo glamuroso"),
+        Triple(EditorTool.HDR, Icons.Filled.HdrStrong, "HDR-scape"),
+        Triple(EditorTool.DRAMA, Icons.Filled.Bolt, "Drama"),
+        Triple(EditorTool.VINTAGE, Icons.Filled.PhotoCamera, "Vintage"),
+        Triple(EditorTool.GRAINY_FILM, Icons.Filled.Movie, "Pelicula granulada"),
+        Triple(EditorTool.RETROLUX, Icons.Filled.Flare, "Retrolux"),
+        Triple(EditorTool.GRUNGE, Icons.Filled.Texture, "Grunge"),
+        Triple(EditorTool.BNW, Icons.Filled.FilterBAndW, "B/N"),
+        Triple(EditorTool.NOIR, Icons.Filled.Contrast, "Noir"),
+        Triple(EditorTool.PORTRAIT, Icons.Filled.Face, "Retrato"),
+        Triple(EditorTool.LENS_BLUR, Icons.Filled.BlurOn, "Desenfoque"),
+        Triple(EditorTool.VIGNETTE, Icons.Filled.Vignette, "Vineta"),
+        Triple(EditorTool.DOUBLE_EXPO, Icons.Filled.Layers, "Doble exposicion"),
+        Triple(EditorTool.TEXT, Icons.Filled.TextFields, "Texto"),
+        Triple(EditorTool.FRAME, Icons.Filled.CropFree, "Marcos")
     )
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .fillMaxHeight(0.72f)
             .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
             .background(Color(0xFF101014))
-            .padding(horizontal = 14.dp, vertical = 16.dp)
     ) {
-        tools.chunked(3).forEach { rowTools ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                rowTools.forEach { (tool, icon, label) ->
-                    Card(
-                        onClick = { onSelect(tool) },
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF16161C))
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 14.dp, vertical = 16.dp)
+        ) {
+            tools.chunked(3).forEach { rowTools ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    rowTools.forEach { (tool, icon, label) ->
+                        Card(
+                            onClick = { onSelect(tool) },
+                            modifier = Modifier.weight(1f),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF16161C))
                         ) {
-                            Icon(icon, label, tint = Color.White)
-                            Text(
-                                label,
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(top = 8.dp)
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(icon, label, tint = Color.White)
+                                Text(
+                                    label,
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+                            }
                         }
                     }
                 }
+                Spacer(Modifier.height(10.dp))
             }
-            Spacer(Modifier.height(10.dp))
         }
     }
 }
@@ -2441,5 +2828,41 @@ fun TonalSlider(label: String, value: Float, onChange: (Float) -> Unit) {
             onValueChange = onChange,
             valueRange = -1f..1f
         )
+    }
+}
+
+/** Colores disponibles para Texto y Marcos (ARGB como Long). */
+private val textColorChips = listOf(
+    "Blanco" to 0xFFFFFFFFL,
+    "Negro" to 0xFF000000L,
+    "Rojo" to 0xFFFF0000L,
+    "Amarillo" to 0xFFFFFF00L
+)
+
+/** Panel de intensidad 0..1 generico (HDR, grano, brillo, desenfoque y presets). */
+@Composable
+fun StrengthPanel(
+    label: String,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    onReset: () -> Unit,
+    onApply: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF101014))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text("$label: ${(value * 100).toInt()}%", color = Color.White, fontSize = 13.sp)
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = 0f..1f
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(onClick = onReset) { Text("Restablecer") }
+            Button(onClick = onApply) { Text("Aplicar") }
+        }
     }
 }

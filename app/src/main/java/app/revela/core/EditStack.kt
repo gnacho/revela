@@ -18,6 +18,14 @@ object Tool {
     const val LOOK = "look"
     const val BNW = "bnw"
     const val TONAL = "tonalContrast"
+    const val DETAILS = "details"
+    const val HDR = "hdr"
+    const val GRAIN = "grain"
+    const val GLOW = "glow"
+    const val LENS_BLUR = "lensBlur"
+    const val DOUBLE_EXPO = "doubleExpo"
+    const val TEXT = "textOverlay"
+    const val FRAME = "frame"
 }
 
 /** Punto de control selectivo (coordenadas normalizadas al marco). */
@@ -103,6 +111,59 @@ sealed interface Edit {
         val highlights: Float = 0f
     ) : Edit {
         override val toolId: String get() = Tool.TONAL
+    }
+
+    @Serializable
+    @SerialName("details")
+    data class Details(val structure: Float = 0f, val sharpening: Float = 0f) : Edit {
+        override val toolId: String get() = Tool.DETAILS
+    }
+
+    @Serializable
+    @SerialName("hdr")
+    data class Hdr(val strength: Float = 0f) : Edit {
+        override val toolId: String get() = Tool.HDR
+    }
+
+    @Serializable
+    @SerialName("grain")
+    data class Grain(val strength: Float = 0f) : Edit {
+        override val toolId: String get() = Tool.GRAIN
+    }
+
+    @Serializable
+    @SerialName("glow")
+    data class Glow(val strength: Float = 0f) : Edit {
+        override val toolId: String get() = Tool.GLOW
+    }
+
+    @Serializable
+    @SerialName("lensBlur")
+    data class LensBlur(val strength: Float = 0f) : Edit {
+        override val toolId: String get() = Tool.LENS_BLUR
+    }
+
+    @Serializable
+    @SerialName("doubleExpo")
+    data class DoubleExpo(val blend: String = "normal", val opacity: Float = 0.5f) : Edit {
+        override val toolId: String get() = Tool.DOUBLE_EXPO
+    }
+
+    @Serializable
+    @SerialName("textOverlay")
+    data class TextOverlay(
+        val content: String = "",
+        val colorInt: Long = 0xFFFFFFFFL,
+        val sizePct: Float = 0.08f,
+        val gravity: String = "center"
+    ) : Edit {
+        override val toolId: String get() = Tool.TEXT
+    }
+
+    @Serializable
+    @SerialName("frame")
+    data class Frame(val colorInt: Long = 0xFFFFFFFFL, val widthPct: Float = 0.02f) : Edit {
+        override val toolId: String get() = Tool.FRAME
     }
 }
 

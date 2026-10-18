@@ -80,17 +80,31 @@ object PreviewRender {
         quarterTurns: Int,
         identity: Boolean,
         edits: List<Edit> = stack.edits,
-        adjOverride: app.revela.core.ColorMath.Adjustments? = null
+        adjOverride: app.revela.core.ColorMath.Adjustments? = null,
+        overlay: BaseImage? = null
     ): Bitmap = withContext(Dispatchers.Default) {
         if (identity) return@withContext base.toBitmap()
         val t0 = android.os.SystemClock.elapsedRealtime()
         val (frame, fw, fh) = FrameMath.rotateQuarter(base.pixels, base.width, base.height, quarterTurns)
-        FramePipeline.apply(frame, fw, fh, stack, edits, adjOverride = adjOverride)
+        val overlayFrame = if (edits.any { it is Edit.DoubleExpo }) {
+            overlay?.let { scaleToFrame(it, fw, fh) }
+        } else null
+        FramePipeline.apply(frame, fw, fh, stack, edits, adjOverride = adjOverride, overlay = overlayFrame)
         val bmp = Bitmap.createBitmap(frame, fw, fh, Bitmap.Config.ARGB_8888)
+        TextCompositor.apply(bmp, edits)
         android.util.Log.i(
             "revela",
             "perf render=${android.os.SystemClock.elapsedRealtime() - t0}ms ${fw}x$fh"
         )
         bmp
+    }
+
+    /** Escala una imagen a las dimensiones del marco (para doble exposicion). */
+    fun scaleToFrame(src: BaseImage, w: Int, h: Int): IntArray {
+        val bmp = Bitmap.createScaledBitmap(src.toBitmap(), w, h, true)
+        val out = IntArray(w * h)
+        bmp.getPixels(out, 0, w, 0, 0, w, h)
+        bmp.recycle()
+        return out
     }
 }

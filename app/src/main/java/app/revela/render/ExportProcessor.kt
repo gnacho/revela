@@ -10,6 +10,7 @@ import android.provider.MediaStore
 import android.os.Environment
 import androidx.exifinterface.media.ExifInterface
 import app.revela.core.ColorMath
+import app.revela.core.Edit
 import app.revela.core.EditStack
 import app.revela.core.FramePipeline
 import app.revela.core.GeometryMath
@@ -35,7 +36,8 @@ object ExportProcessor {
         sourceUri: Uri,
         stack: EditStack,
         geometry: GeometryModel,
-        options: ExportOptions
+        options: ExportOptions,
+        overlay: BaseImage? = null
     ): Result<Uri> = withContext(Dispatchers.IO) {
         runCatching {
             val t0 = android.os.SystemClock.elapsedRealtime()
@@ -103,8 +105,12 @@ object ExportProcessor {
             val frameH = current.height
             val framePixels = IntArray(frameW * frameH)
             current.getPixels(framePixels, 0, frameW, 0, 0, frameW, frameH)
-            FramePipeline.apply(framePixels, frameW, frameH, stack)
+            val overlayFrame = if (stack.edits.any { it is Edit.DoubleExpo }) {
+                overlay?.let { PreviewRender.scaleToFrame(it, frameW, frameH) }
+            } else null
+            FramePipeline.apply(framePixels, frameW, frameH, stack, overlay = overlayFrame)
             current.setPixels(framePixels, 0, frameW, 0, 0, frameW, frameH)
+            TextCompositor.apply(current, stack.edits)
 
             val cropped = Bitmap.createBitmap(current, cropX, cropY, cropW, cropH)
             if (cropped != current) current.recycle()

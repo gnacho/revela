@@ -181,6 +181,270 @@ object FrameMath {
         val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
         return t * t * (3f - 2f * t)
     }
+
+    /**
+     * Desenfoque de caja separable (dos pasadas: horizontal y vertical) sobre los canales RGB.
+     * El alpha NO se propaga al resultado (el llamador conserva el alpha original).
+     * Devuelve SIEMPRE un array nuevo; no toca la entrada.
+     */
+    fun boxBlur(pixels: IntArray, w: Int, h: Int, radius: Int): IntArray {
+        if (radius <= 0 || w <= 1 || h <= 1) return pixels.copyOf()
+        val window = 2 * radius + 1
+        val tmp = IntArray(pixels.size)
+        val out = IntArray(pixels.size)
+
+        // pasada horizontal
+        for (y in 0 until h) {
+            val row = y * w
+            var sumR = 0L
+            var sumG = 0L
+            var sumB = 0L
+            for (x in -radius..radius) {
+                val xx = x.coerceIn(0, w - 1)
+                val p = pixels[row + xx]
+                sumR += (p ushr 16) and 0xFF
+                sumG += (p ushr 8) and 0xFF
+                sumB += p and 0xFF
+            }
+            for (x in 0 until w) {
+                tmp[row + x] =
+                    ((sumR / window).toInt() shl 16) or ((sumG / window).toInt() shl 8) or (sumB / window).toInt()
+                val addX = (x + radius + 1).coerceAtMost(w - 1)
+                val remX = (x - radius).coerceAtLeast(0)
+                val pAdd = pixels[row + addX]
+                val pRem = pixels[row + remX]
+                sumR += ((pAdd ushr 16) and 0xFF) - ((pRem ushr 16) and 0xFF)
+                sumG += ((pAdd ushr 8) and 0xFF) - ((pRem ushr 8) and 0xFF)
+                sumB += (pAdd and 0xFF) - (pRem and 0xFF)
+            }
+        }
+
+        // pasada vertical
+        for (x in 0 until w) {
+            var sumR = 0L
+            var sumG = 0L
+            var sumB = 0L
+            for (y in -radius..radius) {
+                val yy = y.coerceIn(0, h - 1)
+                val p = tmp[yy * w + x]
+                sumR += (p ushr 16) and 0xFF
+                sumG += (p ushr 8) and 0xFF
+                sumB += p and 0xFF
+            }
+            for (y in 0 until h) {
+                val i = y * w + x
+                out[i] = (pixels[i] and 0xFF000000.toInt()) or
+                    ((sumR / window).toInt() shl 16) or ((sumG / window).toInt() shl 8) or (sumB / window).toInt()
+                val addY = (y + radius + 1).coerceAtMost(h - 1)
+                val remY = (y - radius).coerceAtLeast(0)
+                val pAdd = tmp[addY * w + x]
+                val pRem = tmp[remY * w + x]
+                sumR += ((pAdd ushr 16) and 0xFF) - ((pRem ushr 16) and 0xFF)
+                sumG += ((pAdd ushr 8) and 0xFF) - ((pRem ushr 8) and 0xFF)
+                sumB += (pAdd and 0xFF) - (pRem and 0xFF)
+            }
+        }
+        return out
+    }
+
+    /** Detalles: estructura (unsharp de radio grande) + enfoque (unsharp de radio pequeno). */
+    fun applyDetails(pixels: IntArray, w: Int, h: Int, structure: Float, sharpening: Float) {
+        val minSide = min(w, h)
+        if (structure != 0f) {
+            val radius = max(2, minSide / 20)
+            val blurred = boxBlur(pixels, w, h, radius)
+            unsharp(pixels, blurred, w, h, structure)
+        }
+        if (sharpening != 0f) {
+            val radius = 1
+            val blurred = boxBlur(pixels, w, h, radius)
+            unsharp(pixels, blurred, w, h, sharpening)
+        }
+    }
+
+    /** v' = v + amount * (v - blur(v)); conserva el alpha. */
+    private fun unsharp(pixels: IntArray, blurred: IntArray, w: Int, h: Int, amount: Float) {
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val b = blurred[i]
+            val r = (p ushr 16) and 0xFF
+            val g = (p ushr 8) and 0xFF
+            val bl = p and 0xFF
+            val br = (b ushr 16) and 0xFF
+            val bg = (b ushr 8) and 0xFF
+            val bb = b and 0xFF
+            val nr = (r + amount * (r - br)).toInt().coerceIn(0, 255)
+            val ng = (g + amount * (g - bg)).toInt().coerceIn(0, 255)
+            val nb = (bl + amount * (bl - bb)).toInt().coerceIn(0, 255)
+            pixels[i] = (p and 0xFF000000.toInt()) or (nr shl 16) or (ng shl 8) or nb
+        }
+    }
+
+    /**
+     * HDR-scape: refuerzo del contraste local (diferencia con un blur grande) + ligera
+     * subida de sombras. strength 0..1.
+     */
+    fun applyHdr(pixels: IntArray, w: Int, h: Int, strength: Float) {
+        if (strength <= 0f) return
+        val radius = max(2, min(w, h) / 15)
+        val blurred = boxBlur(pixels, w, h, radius)
+        val k = 0.6f
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val b = blurred[i]
+            var r = (p ushr 16) and 0xFF
+            var g = (p ushr 8) and 0xFF
+            var bl = p and 0xFF
+            val br = (b ushr 16) and 0xFF
+            val bg = (b ushr 8) and 0xFF
+            val bb = b and 0xFF
+            r = (r + strength * k * (r - br)).toInt().coerceIn(0, 255)
+            g = (g + strength * k * (g - bg)).toInt().coerceIn(0, 255)
+            bl = (bl + strength * k * (bl - bb)).toInt().coerceIn(0, 255)
+            // subida de sombras leve: mas en las zonas oscuras
+            val luma = (r * 54 + g * 183 + bl * 19) / 256
+            val lift = strength * 0.10f * (1f - luma / 255f) * 255f
+            r = (r + lift).toInt().coerceIn(0, 255)
+            g = (g + lift).toInt().coerceIn(0, 255)
+            bl = (bl + lift).toInt().coerceIn(0, 255)
+            pixels[i] = (p and 0xFF000000.toInt()) or (r shl 16) or (g shl 8) or bl
+        }
+    }
+
+    /** Grano determinista: ruido de hash entero sobre la luminancia. strength 0..1. */
+    fun applyGrain(pixels: IntArray, w: Int, h: Int, strength: Float) {
+        if (strength <= 0f) return
+        val amplitude = 60f
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val i = y * w + x
+                val p = pixels[i]
+                val r = (p ushr 16) and 0xFF
+                val g = (p ushr 8) and 0xFF
+                val bl = p and 0xFF
+                val luma = (r * 54 + g * 183 + bl * 19) / 256
+                val n = hashNoise(x, y)
+                val delta = (n * strength * amplitude).toInt()
+                val nl = (luma + delta).coerceIn(0, 255)
+                val diff = nl - luma
+                val nr = (r + diff).coerceIn(0, 255)
+                val ng = (g + diff).coerceIn(0, 255)
+                val nb = (bl + diff).coerceIn(0, 255)
+                pixels[i] = (p and 0xFF000000.toInt()) or (nr shl 16) or (ng shl 8) or nb
+            }
+        }
+    }
+
+    /** Hash entero determinista (x, y) -> ruido -1..1 con semilla fija. */
+    private fun hashNoise(x: Int, y: Int): Float {
+        var h = x * 374761393 + y * 668265263 + GRAIN_SEED
+        h = (h xor (h ushr 13)) * 1274126177
+        h = h xor (h ushr 16)
+        val u = (h and 0x7FFFFFFF).toDouble() / 2147483647.0
+        return (u * 2.0 - 1.0).toFloat()
+    }
+
+    private const val GRAIN_SEED = 0x1a2b3c4d
+
+    /**
+     * Brillo glamuroso (glamour glow): screen-blend con una copia difuminada,
+     * mezclado por strength. v' = 255 - (255-v)*(255-blur(v))/255.
+     */
+    fun applyGlow(pixels: IntArray, w: Int, h: Int, strength: Float) {
+        if (strength <= 0f) return
+        val radius = max(2, min(w, h) / 25)
+        val blurred = boxBlur(pixels, w, h, radius)
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val b = blurred[i]
+            val r = (p ushr 16) and 0xFF
+            val g = (p ushr 8) and 0xFF
+            val bl = p and 0xFF
+            val br = (b ushr 16) and 0xFF
+            val bg = (b ushr 8) and 0xFF
+            val bb = b and 0xFF
+            val sr = 255 - (255 - r) * (255 - br) / 255
+            val sg = 255 - (255 - g) * (255 - bg) / 255
+            val sb = 255 - (255 - bl) * (255 - bb) / 255
+            val nr = (r + (sr - r) * strength).toInt().coerceIn(0, 255)
+            val ng = (g + (sg - g) * strength).toInt().coerceIn(0, 255)
+            val nb = (bl + (sb - bl) * strength).toInt().coerceIn(0, 255)
+            pixels[i] = (p and 0xFF000000.toInt()) or (nr shl 16) or (ng shl 8) or nb
+        }
+    }
+
+    /** Desenfoque radial (lens blur): radio de blur crece con la distancia al centro del marco. */
+    fun applyLensBlur(pixels: IntArray, w: Int, h: Int, strength: Float) {
+        if (strength <= 0f) return
+        val cx = (w - 1) / 2f
+        val cy = (h - 1) / 2f
+        val maxDist = sqrt(cx * cx + cy * cy)
+        if (maxDist <= 0f) return
+        val maxR = max(2, min(w, h) / 12)
+        val levels = 4
+        val blurs = Array(levels + 1) { k ->
+            if (k == 0) pixels.copyOf() else boxBlur(pixels, w, h, max(1, maxR * k / levels))
+        }
+        val step = maxR.toFloat() / levels
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val dx = x - cx
+                val dy = y - cy
+                val d = sqrt(dx * dx + dy * dy) / maxDist
+                val r = strength * maxR * d
+                val kf = (r / step).coerceIn(0f, levels.toFloat())
+                val k0 = kf.toInt()
+                val k1 = min(k0 + 1, levels)
+                val frac = kf - k0
+                val i = y * w + x
+                val p = pixels[i]
+                val b0 = blurs[k0][i]
+                val b1 = blurs[k1][i]
+                val r0 = (b0 ushr 16) and 0xFF
+                val g0 = (b0 ushr 8) and 0xFF
+                val b0c = b0 and 0xFF
+                val r1 = (b1 ushr 16) and 0xFF
+                val g1 = (b1 ushr 8) and 0xFF
+                val b1c = b1 and 0xFF
+                val nr = (r0 + (r1 - r0) * frac).toInt().coerceIn(0, 255)
+                val ng = (g0 + (g1 - g0) * frac).toInt().coerceIn(0, 255)
+                val nb = (b0c + (b1c - b0c) * frac).toInt().coerceIn(0, 255)
+                pixels[i] = (p and 0xFF000000.toInt()) or (nr shl 16) or (ng shl 8) or nb
+            }
+        }
+    }
+
+    /**
+     * Doble exposicion: mezcla overlay (mismo tamano que pixels) sobre pixels in situ.
+     * blend en {"normal","screen","multiply","lighten","darken"}; opacity 0..1.
+     */
+    fun applyDoubleExpo(pixels: IntArray, overlay: IntArray, w: Int, h: Int, blend: String, opacity: Float) {
+        if (opacity <= 0f) return
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val o = overlay[i]
+            val r = BlendModes.mix((p ushr 16) and 0xFF, (o ushr 16) and 0xFF, blend, opacity)
+            val g = BlendModes.mix((p ushr 8) and 0xFF, (o ushr 8) and 0xFF, blend, opacity)
+            val b = BlendModes.mix(p and 0xFF, o and 0xFF, blend, opacity)
+            pixels[i] = (p and 0xFF000000.toInt()) or (r shl 16) or (g shl 8) or b
+        }
+    }
+}
+
+/** Modos de mezcla por canal (0..255) para doble exposicion, testables de forma exacta. */
+object BlendModes {
+    fun channel(a: Int, b: Int, mode: String): Int = when (mode) {
+        "screen" -> 255 - (255 - a) * (255 - b) / 255
+        "multiply" -> a * b / 255
+        "lighten" -> maxOf(a, b)
+        "darken" -> minOf(a, b)
+        else -> b // normal
+    }
+
+    fun mix(a: Int, b: Int, mode: String, opacity: Float): Int {
+        val blended = channel(a, b, mode)
+        return (a + (blended - a) * opacity).toInt().coerceIn(0, 255)
+    }
 }
 
 /** Pesos de filtro B/N (canal rojo/amarillo/verde/azul) sobre luminancia. */
