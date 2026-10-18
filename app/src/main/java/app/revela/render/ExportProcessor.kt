@@ -97,7 +97,7 @@ object ExportProcessor {
             val framePixels = IntArray(frameW * frameH)
             current.getPixels(framePixels, 0, frameW, 0, 0, frameW, frameH)
             val overlayFrame = if (stack.edits.any { it is Edit.DoubleExpo }) {
-                overlay?.let { PreviewRender.scaleToFrame(it, frameW, frameH) }
+                overlay?.let { app.revela.core.OverlayFrame(it.pixels, it.width, it.height) }
             } else null
             FramePipeline.apply(framePixels, frameW, frameH, stack, overlay = overlayFrame)
             // Pase geometrico (Expand/Perspective/HeadPose) sobre el frame compuesto;

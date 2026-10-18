@@ -149,7 +149,14 @@ sealed interface Edit {
 
     @Serializable
     @SerialName("doubleExpo")
-    data class DoubleExpo(val blend: String = "normal", val opacity: Float = 0.5f) : Edit {
+    data class DoubleExpo(
+        val blend: String = "normal",
+        val opacity: Float = 0.5f,
+        val scale: Float = 1f,
+        val rotationDeg: Float = 0f,
+        val offsetX: Float = 0f,
+        val offsetY: Float = 0f
+    ) : Edit {
         override val toolId: String get() = Tool.DOUBLE_EXPO
     }
 

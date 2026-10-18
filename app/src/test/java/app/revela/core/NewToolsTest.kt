@@ -87,7 +87,7 @@ class NewToolsTest {
     fun `doble exposicion normal al 50 por ciento`() {
         val base = intArrayOf(pixel(100, 100, 100))
         val overlay = intArrayOf(pixel(200, 200, 200))
-        FrameMath.applyDoubleExpo(base, overlay, 1, 1, "normal", 0.5f)
+        FrameMath.applyDoubleExpo(base, overlay, 1, 1, 1, 1, "normal", 0.5f)
         assertEquals(150, channel(base[0]))
     }
 

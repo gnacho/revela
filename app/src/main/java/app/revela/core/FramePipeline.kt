@@ -1,5 +1,8 @@
 package app.revela.core
 
+/** 2a capa de doble exposicion en sus dimensiones originales (la transformacion la aplica el pase). */
+data class OverlayFrame(val pixels: IntArray, val w: Int, val h: Int)
+
 /**
  * Pipeline de render del marco (espacio de imagen girada, ANTES del recorte),
  * compartido por preview y export para que el resultado sea identico.
@@ -17,7 +20,7 @@ object FramePipeline {
         edits: List<Edit> = stack.edits,
         identity: Boolean = false,
         adjOverride: ColorMath.Adjustments? = null,
-        overlay: IntArray? = null
+        overlay: OverlayFrame? = null
     ) {
         if (identity) return
 
@@ -29,10 +32,13 @@ object FramePipeline {
             }
         }
 
-        // 1b) doble exposicion: mezcla el overlay (ya escalado al marco) sobre la base
+        // 1b) doble exposicion: mezcla la 2a capa (con transformacion) sobre la base
         for (e in edits) {
             if (e is Edit.DoubleExpo && overlay != null) {
-                FrameMath.applyDoubleExpo(pixels, overlay, w, h, e.blend, e.opacity)
+                FrameMath.applyDoubleExpo(
+                    pixels, overlay.pixels, overlay.w, overlay.h, w, h,
+                    e.blend, e.opacity, e.scale, e.rotationDeg, e.offsetX, e.offsetY
+                )
                 break
             }
         }

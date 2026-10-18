@@ -87,7 +87,7 @@ object PreviewRender {
         val t0 = android.os.SystemClock.elapsedRealtime()
         val (frame, fw, fh) = FrameMath.rotateQuarter(base.pixels, base.width, base.height, quarterTurns)
         val overlayFrame = if (edits.any { it is Edit.DoubleExpo }) {
-            overlay?.let { scaleToFrame(it, fw, fh) }
+            overlay?.let { app.revela.core.OverlayFrame(it.pixels, it.width, it.height) }
         } else null
         FramePipeline.apply(frame, fw, fh, stack, edits, adjOverride = adjOverride, overlay = overlayFrame)
         val (gFrame, gW, gH) = app.revela.core.GeometryPass.apply(frame, fw, fh, edits)

@@ -94,10 +94,10 @@ Scope: FASE 11 completa en 5 paquetes ordenados: HOME (biblioteca de sesiones pe
   EXPECT: GRID28_OK (rejilla) + GRID28_FUNC_OK (perspective y brush funcionales)
   EVIDENCE: automatic-evidence=v1; definition-sha256=db0e4f0a5a8acb74db5fdc58a791456a453e2026b180eb0102e698c630e1550f; exit=0; EXPECT=matched; output-sha256=46de3ce70786043740dba1c7455814905f81f3e4148ec68682ec34dbfff61bc4; output-bytes=14; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git
 
-- [ ] G17: Doble exposicion completa: blends add y overlay, opacity y transform (rotar/escalar) de la 2a capa con test JVM del blend
-  CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && grep -q "DoubleExposureTest" app/build/test-results/testDebugUnitTest/TEST-app.revela.core.DoubleExposureTest.xml 2>/dev/null && echo DBL_OK
+- [x] G17: Doble exposicion completa: blends add y overlay, opacity y transform (rotar/escalar) de la 2a capa con test JVM del blend
+  CHECK: ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && grep -q "DoubleExposureTest" app/build/test-results/testDebugUnitTest/TEST-app.revela.core.DoubleExposureTest.xml 2>/dev/null && echo DBL_OK
   EXPECT: DBL_OK
-  EVIDENCE: (pendiente)
+  EVIDENCE: automatic-evidence=v1; definition-sha256=7ec12389f05121c88618bbb247b6afffd042b1d9120a38fb630f32e38599e130; exit=0; EXPECT=matched; output-sha256=a8f606436ac578097a53867e60a71d0f050f3c0f74e79b551fe63dd379f49e93; output-bytes=6; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git
 
 - [ ] G18: Animacion look_thumbnail_state replicada en el carrusel de Estilos (frames intermedios, no aparicion en seco)
   CHECK: (screenrecord del carrusel al cambiar de estilo; frames intermedios con alpha/scale entre thumbs)

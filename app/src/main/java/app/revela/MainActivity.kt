@@ -1408,6 +1408,25 @@ fun EditorScreen(
                             }
                         }
 
+                        EditorTool.DOUBLE_EXPO -> {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .pointerInput(Unit) {
+                                        detectDragGestures { change, amount ->
+                                            change.consume()
+                                            val cur = (workingEdit as? Edit.DoubleExpo)
+                                                ?: stack.edits.filterIsInstance<Edit.DoubleExpo>().firstOrNull()
+                                                ?: Edit.DoubleExpo()
+                                            workingEdit = cur.copy(
+                                                offsetX = (cur.offsetX + amount.x / size.width).coerceIn(-0.5f, 0.5f),
+                                                offsetY = (cur.offsetY + amount.y / size.height).coerceIn(-0.5f, 0.5f)
+                                            )
+                                        }
+                                    }
+                            )
+                        }
+
                         EditorTool.CROP -> {
                             if (inCrop && cropWorking != null) {
                                 CropOverlay(
@@ -2418,6 +2437,9 @@ fun EditorScreen(
                                         ) {
                                             listOf(
                                                 "normal" to "Normal",
+                                                "add" to "Suma",
+                                                "overlay" to "Superponer",
+                                                "subtract" to "Resta",
                                                 "screen" to "Pantalla",
                                                 "multiply" to "Multiplicar",
                                                 "lighten" to "Aclarar",
@@ -2451,6 +2473,24 @@ fun EditorScreen(
                                             value = cur.opacity,
                                             onValueChange = { workingEdit = cur.copy(opacity = it) },
                                             valueRange = 0f..1f
+                                        )
+                                        Text(
+                                            "Escala capa: ${(cur.scale * 100).toInt()}%  |  Rotacion: ${cur.rotationDeg.toInt()} grados",
+                                            color = Color.White, fontSize = 13.sp
+                                        )
+                                        Slider(
+                                            value = cur.scale,
+                                            onValueChange = { workingEdit = cur.copy(scale = it) },
+                                            valueRange = 0.5f..2f
+                                        )
+                                        Slider(
+                                            value = cur.rotationDeg,
+                                            onValueChange = { workingEdit = cur.copy(rotationDeg = it) },
+                                            valueRange = -45f..45f
+                                        )
+                                        Text(
+                                            "Arrastra la foto para mover la 2a capa",
+                                            color = Color(0xFF9E9E9E), fontSize = 12.sp
                                         )
                                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                             OutlinedButton(onClick = {

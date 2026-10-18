@@ -415,18 +415,54 @@ object FrameMath {
     }
 
     /**
-     * Doble exposicion: mezcla overlay (mismo tamano que pixels) sobre pixels in situ.
-     * blend en {"normal","screen","multiply","lighten","darken"}; opacity 0..1.
+     * Doble exposicion: mezcla overlay (dimensiones ow x oh, cualquier aspecto) sobre
+     * pixels (w x h) in situ, con cover + transformacion de la 2a capa
+     * (escala, rotacion en grados y offset normalizado al marco).
+     * blend en {normal, screen, multiply, lighten, darken, add, subtract, overlay}; opacity 0..1.
      */
-    fun applyDoubleExpo(pixels: IntArray, overlay: IntArray, w: Int, h: Int, blend: String, opacity: Float) {
+    fun applyDoubleExpo(
+        pixels: IntArray,
+        overlay: IntArray,
+        ow: Int,
+        oh: Int,
+        w: Int,
+        h: Int,
+        blend: String,
+        opacity: Float,
+        scale: Float = 1f,
+        rotationDeg: Float = 0f,
+        offsetX: Float = 0f,
+        offsetY: Float = 0f
+    ) {
         if (opacity <= 0f) return
-        for (i in pixels.indices) {
-            val p = pixels[i]
-            val o = overlay[i]
-            val r = BlendModes.mix((p ushr 16) and 0xFF, (o ushr 16) and 0xFF, blend, opacity)
-            val g = BlendModes.mix((p ushr 8) and 0xFF, (o ushr 8) and 0xFF, blend, opacity)
-            val b = BlendModes.mix(p and 0xFF, o and 0xFF, blend, opacity)
-            pixels[i] = (p and 0xFF000000.toInt()) or (r shl 16) or (g shl 8) or b
+        // cover: escala del overlay para cubrir el marco
+        val cover = maxOf(ow.toFloat() / w, oh.toFloat() / h)
+        val covX = (ow - w * cover) / 2f
+        val covY = (oh - h * cover) / 2f
+        val rad = Math.toRadians(-rotationDeg.toDouble()).toFloat()
+        val cos = kotlin.math.cos(rad)
+        val sin = kotlin.math.sin(rad)
+        val invScale = 1f / scale.coerceIn(0.1f, 5f)
+        var i = 0
+        for (y in 0 until h) {
+            val v = (y + 0.5f) / h - 0.5f
+            for (x in 0 until w) {
+                val u = (x + 0.5f) / w - 0.5f
+                // transformacion inversa del punto destino
+                val tx = (u - offsetX) * invScale
+                val ty = (v - offsetY) * invScale
+                val rx = tx * cos - ty * sin
+                val ry = tx * sin + ty * cos
+                val oxF = (rx + 0.5f) * w * cover + covX
+                val oyF = (ry + 0.5f) * h * cover + covY
+                val o = PerspectiveMath.sampleBilinear(overlay, ow, oh, oxF / ow, oyF / oh)
+                val p = pixels[i]
+                val r = BlendModes.mix((p ushr 16) and 0xFF, (o ushr 16) and 0xFF, blend, opacity)
+                val g = BlendModes.mix((p ushr 8) and 0xFF, (o ushr 8) and 0xFF, blend, opacity)
+                val b = BlendModes.mix(p and 0xFF, o and 0xFF, blend, opacity)
+                pixels[i] = (p and 0xFF000000.toInt()) or (r shl 16) or (g shl 8) or b
+                i++
+            }
         }
     }
 }
@@ -438,7 +474,10 @@ object BlendModes {
         "multiply" -> a * b / 255
         "lighten" -> maxOf(a, b)
         "darken" -> minOf(a, b)
-        else -> b // normal
+        "add" -> minOf(255, a + b)
+        "subtract" -> maxOf(0, a - b)
+        "overlay" -> if (a < 128) 2 * a * b / 255 else 255 - 2 * (255 - a) * (255 - b) / 255
+        else -> b // normal (default en Snapseed)
     }
 
     fun mix(a: Int, b: Int, mode: String, opacity: Float): Int {
