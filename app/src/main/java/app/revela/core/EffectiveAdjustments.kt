@@ -33,7 +33,8 @@ object EffectiveAdjustments {
                 )
                 is Edit.Heal, is Edit.Selective, is Edit.Vignette, is Edit.Bnw,
                 is Edit.Details, is Edit.Hdr, is Edit.Grain, is Edit.Glow, is Edit.LensBlur,
-                is Edit.DoubleExpo, is Edit.TextOverlay, is Edit.Frame -> a
+                is Edit.DoubleExpo, is Edit.TextOverlay, is Edit.Frame,
+                is Edit.Perspective, is Edit.Expand, is Edit.Brush, is Edit.HeadPose -> a
             }
         }
         return a

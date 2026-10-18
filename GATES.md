@@ -89,10 +89,10 @@ Scope: FASE 11 completa en 5 paquetes ordenados: HOME (biblioteca de sesiones pe
   EXPECT: FAV_OK
   EVIDENCE: automatic-evidence=v1; definition-sha256=7691dd29aa45e980a198b20a9adb44f86f99d231d9f495d8aa85608d46e1fdbf; exit=0; EXPECT=matched; output-sha256=9a810d253c3b10a3608814a62b21b4caed58cff617c986d0cbc7b1409ae16b6e; output-bytes=6; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git
 
-- [ ] G16: Rejilla 28/28: Perspective, Expandir, Pincel y Pose presentes en la rejilla en release con scroll
-  CHECK: (uiautomator dump de la rejilla en release tras implementar; assert las 28 etiquetas presentes)
-  EXPECT: GRID28_OK
-  EVIDENCE: (pendiente)
+- [x] G16: Rejilla 28/28: Perspective, Expandir, Pincel y Pose presentes en la rejilla en release con scroll
+  CHECK: ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && ./gradlew assembleRelease -q > /dev/null 2>&1 && python3 ~/temp/opencode-work/revela-gates/g16.py 2>&1 | tail -1 && python3 ~/temp/opencode-work/revela-gates/g16func.py 2>&1 | tail -1
+  EXPECT: GRID28_OK (rejilla) + GRID28_FUNC_OK (perspective y brush funcionales)
+  EVIDENCE: automatic-evidence=v1; definition-sha256=db0e4f0a5a8acb74db5fdc58a791456a453e2026b180eb0102e698c630e1550f; exit=0; EXPECT=matched; output-sha256=46de3ce70786043740dba1c7455814905f81f3e4148ec68682ec34dbfff61bc4; output-bytes=14; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git
 
 - [ ] G17: Doble exposicion completa: blends add y overlay, opacity y transform (rotar/escalar) de la 2a capa con test JVM del blend
   CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && grep -q "DoubleExposureTest" app/build/test-results/testDebugUnitTest/TEST-app.revela.core.DoubleExposureTest.xml 2>/dev/null && echo DBL_OK

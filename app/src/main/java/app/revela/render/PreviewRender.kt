@@ -90,7 +90,8 @@ object PreviewRender {
             overlay?.let { scaleToFrame(it, fw, fh) }
         } else null
         FramePipeline.apply(frame, fw, fh, stack, edits, adjOverride = adjOverride, overlay = overlayFrame)
-        val bmp = Bitmap.createBitmap(frame, fw, fh, Bitmap.Config.ARGB_8888)
+        val (gFrame, gW, gH) = app.revela.core.GeometryPass.apply(frame, fw, fh, edits)
+        val bmp = Bitmap.createBitmap(gFrame, gW, gH, Bitmap.Config.ARGB_8888)
         TextCompositor.apply(bmp, edits)
         android.util.Log.i(
             "revela",

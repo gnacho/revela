@@ -23,6 +23,10 @@ object Tool {
     const val GRAIN = "grain"
     const val GLOW = "glow"
     const val LENS_BLUR = "lensBlur"
+    const val PERSPECTIVE = "perspective"
+    const val EXPAND = "expand"
+    const val BRUSH = "brush"
+    const val HEAD_POSE = "headPose"
     const val DOUBLE_EXPO = "doubleExpo"
     const val TEXT = "textOverlay"
     const val FRAME = "frame"
@@ -164,6 +168,47 @@ sealed interface Edit {
     @SerialName("frame")
     data class Frame(val colorInt: Long = 0xFFFFFFFFL, val widthPct: Float = 0.02f) : Edit {
         override val toolId: String get() = Tool.FRAME
+    }
+
+    @Serializable
+    @SerialName("perspective")
+    data class Perspective(
+        val corners: PerspectiveCorners = PerspectiveCorners.IDENTITY,
+        val mode: String = "free"
+    ) : Edit {
+        override val toolId: String get() = Tool.PERSPECTIVE
+    }
+
+    @Serializable
+    @SerialName("expand")
+    data class Expand(
+        val edges: ExpandEdges = ExpandEdges(),
+        val mirror: Boolean = false
+    ) : Edit {
+        override val toolId: String get() = Tool.EXPAND
+    }
+
+    @Serializable
+    @SerialName("brush")
+    data class Brush(
+        val param: String = "exposure",
+        val amount: Float = 0f,
+        val strokes: List<HealStroke> = emptyList()
+    ) : Edit {
+        // un edit por parametro: cada pincel apila su propio efecto
+        override val toolId: String get() = "${Tool.BRUSH}:$param"
+    }
+
+    @Serializable
+    @SerialName("headPose")
+    data class HeadPose(
+        val leftEye: ControlPoint? = null,
+        val rightEye: ControlPoint? = null,
+        val mouth: ControlPoint? = null,
+        val yawDeg: Float = 0f,
+        val pitchDeg: Float = 0f
+    ) : Edit {
+        override val toolId: String get() = Tool.HEAD_POSE
     }
 }
 

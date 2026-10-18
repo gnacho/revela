@@ -86,15 +86,6 @@ object ExportProcessor {
                 current = trimmed
             }
 
-            val cropW = (geometry.cropWidthNorm * current.width).roundToInt()
-                .coerceIn(1, current.width)
-            val cropH = (geometry.cropHeightNorm * current.height).roundToInt()
-                .coerceIn(1, current.height)
-            val cropX = (geometry.cropLeft * current.width).roundToInt()
-                .coerceIn(0, current.width - cropW)
-            val cropY = (geometry.cropTop * current.height).roundToInt()
-                .coerceIn(0, current.height - cropH)
-
             // 3. Pases de marco sobre el encuadre girado completo (mismo orden que la preview):
             //    sanar -> color global -> selectivo -> vineta
             if (!current.isMutable) {
@@ -109,8 +100,20 @@ object ExportProcessor {
                 overlay?.let { PreviewRender.scaleToFrame(it, frameW, frameH) }
             } else null
             FramePipeline.apply(framePixels, frameW, frameH, stack, overlay = overlayFrame)
-            current.setPixels(framePixels, 0, frameW, 0, 0, frameW, frameH)
+            // Pase geometrico (Expand/Perspective/HeadPose) sobre el frame compuesto;
+            // puede cambiar el tamano del lienzo
+            val (gFrame, gW, gH) = app.revela.core.GeometryPass.apply(framePixels, frameW, frameH, stack.edits)
+            current = Bitmap.createBitmap(gFrame, gW, gH, Bitmap.Config.ARGB_8888)
             TextCompositor.apply(current, stack.edits)
+
+            val cropW = (geometry.cropWidthNorm * current.width).roundToInt()
+                .coerceIn(1, current.width)
+            val cropH = (geometry.cropHeightNorm * current.height).roundToInt()
+                .coerceIn(1, current.height)
+            val cropX = (geometry.cropLeft * current.width).roundToInt()
+                .coerceIn(0, current.width - cropW)
+            val cropY = (geometry.cropTop * current.height).roundToInt()
+                .coerceIn(0, current.height - cropH)
 
             val cropped = Bitmap.createBitmap(current, cropX, cropY, cropW, cropH)
             if (cropped != current) current.recycle()

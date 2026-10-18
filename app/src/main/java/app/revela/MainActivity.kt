@@ -175,6 +175,10 @@ import androidx.core.net.toUri
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Transform
+import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.FaceRetouchingNatural
 import androidx.compose.ui.graphics.asAndroidBitmap
 import java.io.ByteArrayOutputStream
 
@@ -182,11 +186,15 @@ enum class EditorTool(val id: String, val label: String) {
     TUNE("tune", "Ajustar imagen"),
     CURVES(Tool.CURVES, "Curvas"),
     TONE(Tool.TONAL, "Contraste tonal"),
-    SELECTIVE(Tool.SELECTIVE, "Selectivo"),
     VIGNETTE(Tool.VIGNETTE, "Vineta"),
     HEAL(Tool.HEAL, "Quitamanchas"),
     CROP(Tool.CROP, "Recortar"),
     ROTATE("rotate", "Girar"),
+    PERSPECTIVE(Tool.PERSPECTIVE, "Perspectiva"),
+    EXPAND(Tool.EXPAND, "Expandir"),
+    SELECTIVE(Tool.SELECTIVE, "Selectivo"),
+    BRUSH(Tool.BRUSH, "Pincel"),
+    HEAD_POSE(Tool.HEAD_POSE, "Pose"),
     BNW(Tool.BNW, "Blanco y negro"),
     WB(Tool.WHITE_BALANCE, "Balance blancos"),
     DETAILS(Tool.DETAILS, "Detalles"),
@@ -216,6 +224,65 @@ fun EditorTool.presetKind(): Presets.Kind? = when (this) {
     EditorTool.NOIR -> Presets.Kind.NOIR
     EditorTool.PORTRAIT -> Presets.Kind.PORTRAIT
     else -> null
+}
+
+/** Manijas visibles de Perspectiva segun el modo (8 puntos: 4 esquinas + 4 puntos medios de borde). */
+fun perspHandles(mode: String, c: app.revela.core.PerspectiveCorners): List<Pair<Float, Float>> = when (mode) {
+    "scale" -> listOf(
+        (c.tlX + c.trX) / 2f to minOf(c.tlY, c.trY),
+        maxOf(c.trX, c.brX) to (c.trY + c.brY) / 2f,
+        (c.blX + c.brX) / 2f to maxOf(c.blY, c.brY),
+        minOf(c.tlX, c.blX) to (c.tlY + c.blY) / 2f
+    )
+    "rotate" -> emptyList()
+    else -> listOf(c.tlX to c.tlY, c.trX to c.trY, c.brX to c.brY, c.blX to c.blY)
+}
+
+fun perspNearestHandle(mode: String, c: app.revela.core.PerspectiveCorners, u: Float, v: Float): Int {
+    val hs = perspHandles(mode, c)
+    var best = -1
+    var bd = 0.09f
+    hs.forEachIndexed { i, (hx, hy) ->
+        val d = abs(hx - u) + abs(hy - v)
+        if (d < bd) { bd = d; best = i }
+    }
+    return best
+}
+
+fun perspMoveHandle(
+    mode: String,
+    c: app.revela.core.PerspectiveCorners,
+    idx: Int,
+    u: Float,
+    v: Float
+): app.revela.core.PerspectiveCorners {
+    val cu = u.coerceIn(-0.2f, 1.2f)
+    val cv = v.coerceIn(-0.2f, 1.2f)
+    return when (mode) {
+        // scale: el punto medio mueve todo el borde perpendicularmente
+        "scale" -> when (idx) {
+            0 -> c.copy(tlY = cv, trY = cv)
+            1 -> c.copy(trX = cu, brX = cu)
+            2 -> c.copy(blY = cv, brY = cv)
+            3 -> c.copy(tlX = cu, blX = cu)
+            else -> c
+        }
+        // tilt: arrastrar una esquina mueve el borde al que pertenece (correccion de convergencia)
+        "tilt" -> when (idx) {
+            0 -> c.copy(tlY = cv, trY = cv)
+            1 -> c.copy(trX = cu, brX = cu)
+            2 -> c.copy(blY = cv, brY = cv)
+            3 -> c.copy(tlX = cu, blX = cu)
+            else -> c
+        }
+        else -> when (idx) {
+            0 -> c.copy(tlX = cu, tlY = cv)
+            1 -> c.copy(trX = cu, trY = cv)
+            2 -> c.copy(brX = cu, brY = cv)
+            3 -> c.copy(blX = cu, blY = cv)
+            else -> c
+        }
+    }
 }
 
 /** Pestañas inferiores estilo Snapseed. */
@@ -362,6 +429,56 @@ fun EditorScreen(
     var workingEdit by remember { mutableStateOf<Edit?>(null) }
     var workingPresetIntensity by remember { mutableFloatStateOf(Float.NaN) }
 
+    // Perspectiva / Expandir / Pincel / Pose: estado de trabajo
+    var perspMode by remember { mutableStateOf("free") }
+    var perspCorners by remember { mutableStateOf(app.revela.core.PerspectiveCorners.IDENTITY) }
+    var perspYaw by remember { mutableFloatStateOf(0f) }
+    var perspPitch by remember { mutableFloatStateOf(0f) }
+    var perspRoll by remember { mutableFloatStateOf(0f) }
+    var expandEdges by remember { mutableStateOf(app.revela.core.ExpandEdges()) }
+    var expandMirror by remember { mutableStateOf(false) }
+    var brushParam by remember { mutableStateOf(app.revela.core.BrushMath.EXPOSURE) }
+    var brushAmount by remember { mutableFloatStateOf(0.5f) }
+    var hpLeft by remember { mutableStateOf<ControlPoint?>(null) }
+    var hpRight by remember { mutableStateOf<ControlPoint?>(null) }
+    var hpMouth by remember { mutableStateOf<ControlPoint?>(null) }
+    var hpYawDeg by remember { mutableFloatStateOf(0f) }
+    var hpPitchDeg by remember { mutableFloatStateOf(0f) }
+    var hpStep by remember { mutableIntStateOf(0) }
+
+    // Inicializa el estado de trabajo al entrar en cada herramienta geometrica
+    LaunchedEffect(activeTool) {
+        when (activeTool) {
+            EditorTool.PERSPECTIVE -> {
+                val existing = stack.edits.filterIsInstance<Edit.Perspective>().lastOrNull()
+                perspMode = existing?.mode ?: "free"
+                perspCorners = existing?.corners ?: app.revela.core.PerspectiveCorners.IDENTITY
+                workingEdit = existing ?: Edit.Perspective(perspCorners, perspMode)
+            }
+            EditorTool.EXPAND -> {
+                val existing = stack.edits.filterIsInstance<Edit.Expand>().lastOrNull()
+                expandEdges = existing?.edges ?: app.revela.core.ExpandEdges()
+                expandMirror = existing?.mirror ?: false
+                workingEdit = existing ?: Edit.Expand(expandEdges, expandMirror)
+            }
+            EditorTool.HEAD_POSE -> {
+                val existing = stack.edits.filterIsInstance<Edit.HeadPose>().lastOrNull()
+                hpLeft = existing?.leftEye
+                hpRight = existing?.rightEye
+                hpMouth = existing?.mouth
+                hpYawDeg = existing?.yawDeg ?: 0f
+                hpPitchDeg = existing?.pitchDeg ?: 0f
+                hpStep = 0
+                workingEdit = existing
+            }
+            EditorTool.BRUSH -> {
+                strokeX.clear()
+                strokeY.clear()
+            }
+            else -> {}
+        }
+    }
+
     // Doble exposicion: 2a imagen (sesion volatil; no se persiste en SessionStore para no tocarlo)
     var overlayImage by remember { mutableStateOf<BaseImage?>(null) }
 
@@ -410,6 +527,11 @@ fun EditorScreen(
             delay(400)
             flushThumb()
         }
+    }
+
+    /** Publica el estado de trabajo de Pose como edit en vivo. */
+    fun pushHeadPose() {
+        workingEdit = Edit.HeadPose(hpLeft, hpRight, hpMouth, hpYawDeg, hpPitchDeg)
     }
 
     /** Ajuste de trabajo para un parametro de Ajustar (WB conserva el campo no tocado). */
@@ -775,6 +897,31 @@ fun EditorScreen(
                                 persistSession()
                             }
                         }
+                        EditorTool.PERSPECTIVE -> {
+                            (workingEdit as? Edit.Perspective)?.let {
+                                stack.apply(it)
+                                stackVersion++
+                                persistSession()
+                            }
+                        }
+                        EditorTool.EXPAND -> {
+                            (workingEdit as? Edit.Expand)?.let {
+                                stack.apply(it)
+                                stackVersion++
+                                persistSession()
+                            }
+                        }
+                        EditorTool.HEAD_POSE -> {
+                            (workingEdit as? Edit.HeadPose)?.let {
+                                stack.apply(it)
+                                stackVersion++
+                                persistSession()
+                            }
+                        }
+                        EditorTool.BRUSH -> {
+                            strokeX.clear()
+                            strokeY.clear()
+                        }
                         else -> {}
                     }
                     workingAdj = null
@@ -1054,6 +1201,208 @@ fun EditorScreen(
                                         Color.White.copy(alpha = 0.45f),
                                         radius = r,
                                         center = Offset(strokeX[i] * size.width, strokeY[i] * size.height)
+                                    )
+                                }
+                            }
+                        }
+
+                        EditorTool.PERSPECTIVE -> {
+                            val cur = (workingEdit as? Edit.Perspective)?.corners ?: perspCorners
+                            var dragging by remember { mutableIntStateOf(-1) }
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .pointerInput(perspMode) {
+                                        detectDragGestures(
+                                            onDragStart = { pos ->
+                                                val u = pos.x / size.width
+                                                val v = pos.y / size.height
+                                                dragging = perspNearestHandle(perspMode, cur, u, v)
+                                            },
+                                            onDrag = { change, _ ->
+                                                change.consume()
+                                                if (dragging >= 0) {
+                                                    val u = change.position.x / size.width
+                                                    val v = change.position.y / size.height
+                                                    perspCorners = perspMoveHandle(perspMode, cur, dragging, u, v)
+                                                    workingEdit = Edit.Perspective(perspCorners, perspMode)
+                                                }
+                                            },
+                                            onDragEnd = { dragging = -1 }
+                                        )
+                                    }
+                            )
+                            Canvas(modifier = Modifier.matchParentSize()) {
+                                val g = geometry
+                                fun pt(nx: Float, ny: Float) = Offset(
+                                    ((nx - g.cropLeft) / g.cropWidthNorm) * size.width,
+                                    ((ny - g.cropTop) / g.cropHeightNorm) * size.height
+                                )
+                                val pTL = pt(cur.tlX, cur.tlY); val pTR = pt(cur.trX, cur.trY)
+                                val pBR = pt(cur.brX, cur.brY); val pBL = pt(cur.blX, cur.blY)
+                                val path = androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(pTL.x, pTL.y); lineTo(pTR.x, pTR.y)
+                                    lineTo(pBR.x, pBR.y); lineTo(pBL.x, pBL.y); close()
+                                }
+                                drawPath(
+                                    path, Color.White.copy(alpha = 0.7f),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                                )
+                                perspHandles(perspMode, cur).forEach { (hx, hy) ->
+                                    val c = pt(hx, hy)
+                                    drawCircle(Color(0xFF2196F3), radius = 11.dp.toPx(), center = c)
+                                    drawCircle(
+                                        Color.White, radius = 11.dp.toPx(), center = c,
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                                    )
+                                }
+                            }
+                        }
+
+                        EditorTool.EXPAND -> {
+                            val ec = expandEdges.clamped()
+                            val cw = 1f / (1f + ec.left + ec.right)
+                            val ch = 1f / (1f + ec.top + ec.bottom)
+                            val ox = ec.left * cw
+                            val oy = ec.top * ch
+                            var dragSide by remember { mutableIntStateOf(-1) }
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragStart = { pos ->
+                                                val u = pos.x / size.width
+                                                val v = pos.y / size.height
+                                                dragSide = when {
+                                                    abs(u - ox) < 0.06f -> 3
+                                                    abs(u - (ox + cw)) < 0.06f -> 1
+                                                    abs(v - oy) < 0.06f -> 0
+                                                    abs(v - (oy + ch)) < 0.06f -> 2
+                                                    else -> -1
+                                                }
+                                            },
+                                            onDrag = { change, amount ->
+                                                change.consume()
+                                                val du = amount.x / size.width
+                                                val dv = amount.y / size.height
+                                                expandEdges = when (dragSide) {
+                                                    0 -> expandEdges.copy(top = (expandEdges.top - dv).coerceIn(0f, 0.45f))
+                                                    1 -> expandEdges.copy(right = (expandEdges.right + du).coerceIn(0f, 0.45f))
+                                                    2 -> expandEdges.copy(bottom = (expandEdges.bottom + dv).coerceIn(0f, 0.45f))
+                                                    3 -> expandEdges.copy(left = (expandEdges.left - du).coerceIn(0f, 0.45f))
+                                                    else -> expandEdges
+                                                }
+                                                workingEdit = Edit.Expand(expandEdges, expandMirror)
+                                            },
+                                            onDragEnd = { dragSide = -1 }
+                                        )
+                                    }
+                            )
+                            Canvas(modifier = Modifier.matchParentSize()) {
+                                val g = geometry
+                                val l = ((ox - g.cropLeft) / g.cropWidthNorm) * size.width
+                                val t = ((oy - g.cropTop) / g.cropHeightNorm) * size.height
+                                val r = (((ox + cw) - g.cropLeft) / g.cropWidthNorm) * size.width
+                                val b = (((oy + ch) - g.cropTop) / g.cropHeightNorm) * size.height
+                                drawRect(
+                                    Color.White.copy(alpha = 0.7f),
+                                    topLeft = Offset(l, t),
+                                    size = androidx.compose.ui.geometry.Size(r - l, b - t),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                                )
+                                arrayOf(
+                                    Offset((l + r) / 2f, t), Offset(r, (t + b) / 2f),
+                                    Offset((l + r) / 2f, b), Offset(l, (t + b) / 2f)
+                                ).forEach { c ->
+                                    drawCircle(Color(0xFF2196F3), radius = 10.dp.toPx(), center = c)
+                                }
+                            }
+                        }
+
+                        EditorTool.BRUSH -> {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragStart = { pos ->
+                                                strokeX.add(pos.x / viewportWpx)
+                                                strokeY.add(pos.y / viewportHpx)
+                                            },
+                                            onDrag = { change, _ ->
+                                                change.consume()
+                                                strokeX.add(change.position.x / viewportWpx)
+                                                strokeY.add(change.position.y / viewportHpx)
+                                            }
+                                        )
+                                    }
+                            )
+                            Canvas(modifier = Modifier.matchParentSize()) {
+                                val r = brushSize * size.minDimension
+                                for (i in strokeX.indices) {
+                                    drawCircle(
+                                        Color(0xFF2196F3).copy(alpha = 0.45f),
+                                        radius = r,
+                                        center = Offset(strokeX[i] * size.width, strokeY[i] * size.height)
+                                    )
+                                }
+                            }
+                        }
+
+                        EditorTool.HEAD_POSE -> {
+                            var dragIdx by remember { mutableIntStateOf(-1) }
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .pointerInput(Unit) {
+                                        detectTapGestures { pos ->
+                                            val u = pos.x / size.width
+                                            val v = pos.y / size.height
+                                            when {
+                                                hpLeft == null || hpStep == 0 -> { hpLeft = ControlPoint(u, v); hpStep = 1 }
+                                                hpRight == null || hpStep == 1 -> { hpRight = ControlPoint(u, v); hpStep = 2 }
+                                                hpMouth == null || hpStep == 2 -> { hpMouth = ControlPoint(u, v); hpStep = 3 }
+                                                else -> {
+                                                    val pts = listOfNotNull(hpLeft, hpRight, hpMouth)
+                                                    dragIdx = pts.indexOfFirst { abs(it.x - u) < 0.08f && abs(it.y - v) < 0.08f }
+                                                }
+                                            }
+                                            pushHeadPose()
+                                        }
+                                    }
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragStart = { pos ->
+                                                val u = pos.x / size.width
+                                                val v = pos.y / size.height
+                                                val pts = listOfNotNull(hpLeft, hpRight, hpMouth)
+                                                dragIdx = pts.indexOfFirst { abs(it.x - u) < 0.08f && abs(it.y - v) < 0.08f }
+                                            },
+                                            onDrag = { change, _ ->
+                                                change.consume()
+                                                if (dragIdx >= 0) {
+                                                    val u = (change.position.x / size.width).coerceIn(0f, 1f)
+                                                    val v = (change.position.y / size.height).coerceIn(0f, 1f)
+                                                    when (dragIdx) {
+                                                        0 -> hpLeft = ControlPoint(u, v)
+                                                        1 -> hpRight = ControlPoint(u, v)
+                                                        2 -> hpMouth = ControlPoint(u, v)
+                                                    }
+                                                    pushHeadPose()
+                                                }
+                                            },
+                                            onDragEnd = { dragIdx = -1 }
+                                        )
+                                    }
+                            )
+                            Canvas(modifier = Modifier.matchParentSize()) {
+                                listOfNotNull(hpLeft, hpRight, hpMouth).forEach { p ->
+                                    val c = Offset(p.x * size.width, p.y * size.height)
+                                    drawCircle(Color(0xFF2196F3), radius = 12.dp.toPx(), center = c)
+                                    drawCircle(
+                                        Color.White, radius = 12.dp.toPx(), center = c,
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
                                     )
                                 }
                             }
@@ -1454,6 +1803,243 @@ fun EditorScreen(
                                             strokeX.clear()
                                             strokeY.clear()
                                         }) { Text("Descartar trazo") }
+                                    }
+                                }
+
+                                EditorTool.PERSPECTIVE -> Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF101014))
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        "Perspectiva: arrastra los puntos azules sobre la foto",
+                                        color = Color.White,
+                                        fontSize = 13.sp
+                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.padding(vertical = 6.dp)
+                                    ) {
+                                        listOf(
+                                            "free" to "Libre", "scale" to "Escala",
+                                            "tilt" to "Inclinar", "rotate" to "Rotar"
+                                        ).forEach { (id, label) ->
+                                            FilterChip(
+                                                selected = perspMode == id,
+                                                onClick = {
+                                                    perspMode = id
+                                                    if (id == "rotate") {
+                                                        workingEdit = Edit.Perspective(
+                                                            app.revela.core.PerspectiveMath.rotatedPlane(
+                                                                perspYaw, perspPitch, perspRoll
+                                                            ), id
+                                                        )
+                                                    } else {
+                                                        val keep = (workingEdit as? Edit.Perspective)
+                                                            ?.takeIf { it.mode != "rotate" }?.corners
+                                                        perspCorners = keep ?: app.revela.core.PerspectiveCorners.IDENTITY
+                                                        workingEdit = Edit.Perspective(perspCorners, id)
+                                                    }
+                                                },
+                                                label = { Text(label) }
+                                            )
+                                        }
+                                    }
+                                    if (perspMode == "rotate") {
+                                        Text(
+                                            "Horizontal ${perspYaw.toInt()} grados",
+                                            color = Color.White, fontSize = 12.sp
+                                        )
+                                        Slider(
+                                            value = perspYaw,
+                                            onValueChange = {
+                                                perspYaw = it
+                                                workingEdit = Edit.Perspective(
+                                                    app.revela.core.PerspectiveMath.rotatedPlane(
+                                                        perspYaw, perspPitch, perspRoll
+                                                    ), "rotate"
+                                                )
+                                            },
+                                            valueRange = -30f..30f
+                                        )
+                                        Text(
+                                            "Vertical ${perspPitch.toInt()} grados",
+                                            color = Color.White, fontSize = 12.sp
+                                        )
+                                        Slider(
+                                            value = perspPitch,
+                                            onValueChange = {
+                                                perspPitch = it
+                                                workingEdit = Edit.Perspective(
+                                                    app.revela.core.PerspectiveMath.rotatedPlane(
+                                                        perspYaw, perspPitch, perspRoll
+                                                    ), "rotate"
+                                                )
+                                            },
+                                            valueRange = -30f..30f
+                                        )
+                                        Text(
+                                            "Rotacion ${perspRoll.toInt()} grados",
+                                            color = Color.White, fontSize = 12.sp
+                                        )
+                                        Slider(
+                                            value = perspRoll,
+                                            onValueChange = {
+                                                perspRoll = it
+                                                workingEdit = Edit.Perspective(
+                                                    app.revela.core.PerspectiveMath.rotatedPlane(
+                                                        perspYaw, perspPitch, perspRoll
+                                                    ), "rotate"
+                                                )
+                                            },
+                                            valueRange = -20f..20f
+                                        )
+                                    }
+                                    OutlinedButton(onClick = {
+                                        perspCorners = app.revela.core.PerspectiveCorners.IDENTITY
+                                        perspYaw = 0f; perspPitch = 0f; perspRoll = 0f
+                                        workingEdit = Edit.Perspective(perspCorners, perspMode)
+                                    }) { Text("Restablecer") }
+                                }
+
+                                EditorTool.EXPAND -> Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF101014))
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        "Expandir: arrastra los puntos azules hacia fuera para ampliar el lienzo",
+                                        color = Color.White,
+                                        fontSize = 13.sp
+                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.padding(vertical = 6.dp)
+                                    ) {
+                                        FilterChip(
+                                            selected = !expandMirror,
+                                            onClick = { expandMirror = false; workingEdit = Edit.Expand(expandEdges, false) },
+                                            label = { Text("Relleno borde") }
+                                        )
+                                        FilterChip(
+                                            selected = expandMirror,
+                                            onClick = { expandMirror = true; workingEdit = Edit.Expand(expandEdges, true) },
+                                            label = { Text("Relleno espejo") }
+                                        )
+                                    }
+                                    OutlinedButton(onClick = {
+                                        expandEdges = app.revela.core.ExpandEdges()
+                                        workingEdit = Edit.Expand(expandEdges, expandMirror)
+                                    }) { Text("Restablecer") }
+                                }
+
+                                EditorTool.BRUSH -> Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF101014))
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        "Brocha: ${(brushSize * 100).toInt()}%  |  Intensidad: ${(brushAmount * 100).toInt()}%",
+                                        color = Color.White,
+                                        fontSize = 13.sp
+                                    )
+                                    Slider(
+                                        value = brushSize,
+                                        onValueChange = { brushSize = it },
+                                        valueRange = 0.02f..0.12f
+                                    )
+                                    Slider(
+                                        value = brushAmount,
+                                        onValueChange = { brushAmount = it },
+                                        valueRange = -1f..1f
+                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    ) {
+                                        app.revela.core.BrushMath.PARAMS.forEach { (id, label) ->
+                                            FilterChip(
+                                                selected = brushParam == id,
+                                                onClick = { brushParam = id },
+                                                label = { Text(label) }
+                                            )
+                                        }
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        Button(
+                                            onClick = {
+                                                if (strokeX.isNotEmpty()) {
+                                                    stack.apply(
+                                                        Edit.Brush(
+                                                            param = brushParam,
+                                                            amount = brushAmount,
+                                                            strokes = listOf(
+                                                                app.revela.core.HealStroke(
+                                                                    radiusNorm = brushSize,
+                                                                    xs = strokeX.toList(),
+                                                                    ys = strokeY.toList()
+                                                                )
+                                                            )
+                                                        )
+                                                    )
+                                                    stackVersion++
+                                                    strokeX.clear()
+                                                    strokeY.clear()
+                                                    persistSession()
+                                                }
+                                            },
+                                            enabled = strokeX.isNotEmpty()
+                                        ) { Text("Aplicar trazo") }
+                                        OutlinedButton(onClick = {
+                                            strokeX.clear()
+                                            strokeY.clear()
+                                        }) { Text("Descartar") }
+                                    }
+                                }
+
+                                EditorTool.HEAD_POSE -> Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF101014))
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        when (hpStep) {
+                                            0 -> "Paso 1: toca el ojo izquierdo"
+                                            1 -> "Paso 2: toca el ojo derecho"
+                                            2 -> "Paso 3: toca la boca"
+                                            else -> "Ajusta el giro o arrastra los puntos azules"
+                                        },
+                                        color = Color.White,
+                                        fontSize = 13.sp
+                                    )
+                                    Text(
+                                        "Giro horizontal ${hpYawDeg.toInt()} grados",
+                                        color = Color.White, fontSize = 12.sp
+                                    )
+                                    Slider(
+                                        value = hpYawDeg,
+                                        onValueChange = { hpYawDeg = it; pushHeadPose() },
+                                        valueRange = -30f..30f
+                                    )
+                                    Text(
+                                        "Giro vertical ${hpPitchDeg.toInt()} grados",
+                                        color = Color.White, fontSize = 12.sp
+                                    )
+                                    Slider(
+                                        value = hpPitchDeg,
+                                        onValueChange = { hpPitchDeg = it; pushHeadPose() },
+                                        valueRange = -30f..30f
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        OutlinedButton(onClick = {
+                                            hpLeft = null; hpRight = null; hpMouth = null
+                                            hpStep = 0
+                                            workingEdit = null
+                                        }) { Text("Reiniciar puntos") }
                                     }
                                 }
 
@@ -2700,19 +3286,22 @@ fun TabButton(
     }
 }
 
-/** Catalogo completo de herramientas (orden de la rejilla) compartido por rejilla y barra de favoritos. */
+/** Catalogo completo de herramientas (28, orden Snapseed) compartido por rejilla y barra de favoritos. */
 fun toolCatalog(): List<Triple<EditorTool, androidx.compose.ui.graphics.vector.ImageVector, String>> = listOf(
     Triple(EditorTool.TUNE, Icons.Filled.Tune, "Ajustar imagen"),
     Triple(EditorTool.DETAILS, Icons.Filled.Details, "Detalles"),
     Triple(EditorTool.CURVES, Icons.Filled.ShowChart, "Curvas"),
     Triple(EditorTool.WB, Icons.Filled.WbSunny, "Balance blancos"),
-    Triple(EditorTool.TONE, Icons.Filled.Tonality, "Contraste tonal"),
     Triple(EditorTool.CROP, Icons.Filled.Crop, "Recortar"),
     Triple(EditorTool.ROTATE, Icons.Filled.RotateRight, "Girar"),
+    Triple(EditorTool.PERSPECTIVE, Icons.Filled.Transform, "Perspectiva"),
+    Triple(EditorTool.EXPAND, Icons.Filled.AspectRatio, "Expandir"),
     Triple(EditorTool.SELECTIVE, Icons.Filled.CenterFocusStrong, "Selectivo"),
+    Triple(EditorTool.BRUSH, Icons.Filled.Brush, "Pincel"),
     Triple(EditorTool.HEAL, Icons.Filled.Healing, "Quitamanchas"),
-    Triple(EditorTool.GLOW, Icons.Filled.AutoAwesome, "Brillo glamuroso"),
     Triple(EditorTool.HDR, Icons.Filled.HdrStrong, "HDR-scape"),
+    Triple(EditorTool.GLOW, Icons.Filled.AutoAwesome, "Brillo glamuroso"),
+    Triple(EditorTool.TONE, Icons.Filled.Tonality, "Contraste tonal"),
     Triple(EditorTool.DRAMA, Icons.Filled.Bolt, "Drama"),
     Triple(EditorTool.VINTAGE, Icons.Filled.PhotoCamera, "Vintage"),
     Triple(EditorTool.GRAINY_FILM, Icons.Filled.Movie, "Pelicula granulada"),
@@ -2721,6 +3310,7 @@ fun toolCatalog(): List<Triple<EditorTool, androidx.compose.ui.graphics.vector.I
     Triple(EditorTool.BNW, Icons.Filled.FilterBAndW, "B/N"),
     Triple(EditorTool.NOIR, Icons.Filled.Contrast, "Noir"),
     Triple(EditorTool.PORTRAIT, Icons.Filled.Face, "Retrato"),
+    Triple(EditorTool.HEAD_POSE, Icons.Filled.FaceRetouchingNatural, "Pose"),
     Triple(EditorTool.LENS_BLUR, Icons.Filled.BlurOn, "Desenfoque"),
     Triple(EditorTool.VIGNETTE, Icons.Filled.Vignette, "Vineta"),
     Triple(EditorTool.DOUBLE_EXPO, Icons.Filled.Layers, "Doble exposicion"),

@@ -60,12 +60,18 @@ object FramePipeline {
             }
         }
 
-        // 3) selectivo + 4) vineta
+        // 3) selectivo + 3b) pincel + 4) vineta
         for (e in edits) {
             when (e) {
                 is Edit.Selective -> FrameMath.applySelective(pixels, w, h, e.points)
                 is Edit.Vignette -> FrameMath.applyVignette(pixels, w, h, e.strength)
                 else -> {}
+            }
+        }
+        for (e in edits) {
+            if (e is Edit.Brush && e.strokes.isNotEmpty()) {
+                BrushMath.apply(pixels, w, h, e.param, e.amount, BrushMath.buildDensity(e.strokes, w, h))
+                break
             }
         }
 
