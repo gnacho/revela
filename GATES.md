@@ -65,3 +65,41 @@ Scope: la rejilla de herramientas se abre como panel animado (slide-up ~250 ms) 
   EVIDENCE: automatic-evidence=v1; definition-sha256=fca39a8bb2802101b57dc49ab1adbf574efe33430907f33a3c0b5e67d2e151a9; exit=0; EXPECT=matched; output-sha256=867d5909215690eeb95696f392fa4881e53a38b9b081a5adf59d6f2429611ae7; output-bytes=8; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git; path=13199a136530/15 entries
 
 Handoff (fuera de los gates): el bug de iconos del OnePlus quedó resuelto el 18-Oct (la build actual los renderiza bien en el dispositivo, captura verificada); pendiente solo la confirmación visual del usuario.
+
+---
+
+# Gates: lote FASE 11 - HOME + favoritos + cierre 28/28 + doble exposicion + animacion estilos
+
+OWNS: app/src/main/java/app/revela/MainActivity.kt, app/src/main/java/app/revela/HomeScreen.kt (nuevo), app/src/main/java/app/revela/render/SessionIndexStore.kt (nuevo), app/src/main/java/app/revela/core/FavoritesStore.kt (nuevo), plans/revela/todo.md
+
+Scope: FASE 11 completa en 5 paquetes ordenados: HOME (biblioteca de sesiones persistidas con miniatura, tap reabre), barra de favoritos personalizable siempre visible, cierre 28/28 con la especificacion REA (Perspective 8 puntos 4 modos, Expand, Brush multi-param, Head Pose), Doble exposicion completa (blends add/overlay, opacity, transformar 2a capa), animacion look_thumbnail_state en el carrusel de Estilos.
+
+- [x] G13: HOME: SessionIndexStore con tests JVM (codec, upsert, orden, delete con thumb, prune) y la home lista la sesion editada en release con tap que reabre
+  CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && grep -q "SessionIndexStoreTest" app/build/test-results/testDebugUnitTest/TEST-app.revela.render.SessionIndexStoreTest.xml 2>/dev/null && echo HOME_STORE_OK
+  EXPECT: HOME_STORE_OK
+  EVIDENCE: automatic-evidence=v1; definition-sha256=9d29e05af1c7021880d15d12ac5db7375ffb05b077ee5a26d4f286025405ab76; exit=0; EXPECT=matched; output-sha256=c9e4cd1b02837acefdcff976f72ddb0949165666aabf700cfb9c02b4dee87657; output-bytes=13; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git
+
+- [x] G14: HOME en release: tras editar una foto y volver, la home muestra la tarjeta de la sesion y el tap reabre el editor con el ajuste aplicado
+  CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew assembleRelease -q > /dev/null 2>&1 && python3 ~/temp/opencode-work/revela-gates/g14.py 2>&1 | tail -1
+  EXPECT: HOME_GATE_OK
+  EVIDENCE: automatic-evidence=v1; definition-sha256=d153b8928842fbb34e70a94fdfa308cdd0e94f2d7f13298c521f8cf46a09c85c; exit=0; EXPECT=matched; output-sha256=197480180233d0335f4d418ba5323ffb92aa7859ceb31751d363e0bcdbc1c98c; output-bytes=12; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git
+
+- [ ] G15: Favoritos: FavoritesStore con test JVM (persiste JSON, orden estable) y barra de favoritos visible bajo la barra superior en release
+  CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && grep -q "FavoritesStoreTest" app/build/test-results/testDebugUnitTest/TEST-app.revela.core.FavoritesStoreTest.xml 2>/dev/null && echo FAV_OK
+  EXPECT: FAV_OK
+  EVIDENCE: (pendiente)
+
+- [ ] G16: Rejilla 28/28: Perspective, Expandir, Pincel y Pose presentes en la rejilla en release con scroll
+  CHECK: (uiautomator dump de la rejilla en release tras implementar; assert las 28 etiquetas presentes)
+  EXPECT: GRID28_OK
+  EVIDENCE: (pendiente)
+
+- [ ] G17: Doble exposicion completa: blends add y overlay, opacity y transform (rotar/escalar) de la 2a capa con test JVM del blend
+  CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && grep -q "DoubleExposureTest" app/build/test-results/testDebugUnitTest/TEST-app.revela.core.DoubleExposureTest.xml 2>/dev/null && echo DBL_OK
+  EXPECT: DBL_OK
+  EVIDENCE: (pendiente)
+
+- [ ] G18: Animacion look_thumbnail_state replicada en el carrusel de Estilos (frames intermedios, no aparicion en seco)
+  CHECK: (screenrecord del carrusel al cambiar de estilo; frames intermedios con alpha/scale entre thumbs)
+  EXPECT: LOOKANIM_OK
+  EVIDENCE: (pendiente)

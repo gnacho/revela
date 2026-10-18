@@ -154,6 +154,7 @@ import app.revela.core.EffectiveAdjustments
 import app.revela.render.ExportOptions
 import app.revela.render.ExportProcessor
 import app.revela.render.PreviewRender
+import app.revela.render.SessionIndexStore
 import app.revela.render.SessionStore
 import app.revela.core.AutoLevels
 import app.revela.core.CustomStyle
@@ -170,6 +171,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.core.net.toUri
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.ui.graphics.asAndroidBitmap
+import java.io.ByteArrayOutputStream
 
 enum class EditorTool(val id: String, val label: String) {
     TUNE("tune", "Ajustar imagen"),
@@ -233,7 +238,48 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    EditorScreen()
+                    val context = LocalContext.current
+                    var screen by remember { mutableStateOf("home") }
+                    var startUri by remember { mutableStateOf<Uri?>(null) }
+                    var startSessionId by remember { mutableStateOf<String?>(null) }
+                    var homeTick by remember { mutableIntStateOf(0) }
+                    var showWelcome by remember {
+                        mutableStateOf(!WelcomeStore.isSeen(context.filesDir))
+                    }
+
+                    Box {
+                        when (screen) {
+                            "home" -> HomeScreen(
+                                refreshTick = homeTick,
+                                onOpenPhoto = { uri ->
+                                    startUri = uri
+                                    startSessionId = null
+                                    screen = "editor"
+                                },
+                                onOpenSession = { entry ->
+                                    startUri = entry.uri.toUri()
+                                    startSessionId = entry.id
+                                    screen = "editor"
+                                }
+                            )
+                            else -> EditorScreen(
+                                initialUri = startUri,
+                                initialSessionId = startSessionId,
+                                onHome = {
+                                    homeTick++
+                                    screen = "home"
+                                }
+                            )
+                        }
+                        if (showWelcome) {
+                            WelcomeWizard(
+                                onFinish = {
+                                    WelcomeStore.markSeen(context.filesDir)
+                                    showWelcome = false
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -241,7 +287,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun EditorScreen() {
+fun EditorScreen(
+    initialUri: Uri? = null,
+    initialSessionId: String? = null,
+    onHome: () -> Unit = {}
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -280,9 +330,6 @@ fun EditorScreen() {
     var styleName by remember { mutableStateOf("") }
     var deleteStyle by remember { mutableStateOf<CustomStyle?>(null) }
     var selectedCustomId by remember { mutableStateOf<String?>(null) }
-
-    // Asistente de bienvenida
-    var showWelcome by remember { mutableStateOf(!WelcomeStore.isSeen(context.filesDir)) }
 
     // Selectivo
     var selParam by remember { mutableStateOf(SelParam.BRIGHTNESS) }
@@ -325,9 +372,35 @@ fun EditorScreen() {
         )
     }
 
+    var thumbJob by remember { mutableStateOf<Job?>(null) }
+
+    /** Miniatura de la sesion actual para la biblioteca HOME (PNG en filesDir/thumbs). */
+    suspend fun flushThumb() {
+        val u = sourceUri ?: return
+        val b = base ?: return
+        runCatching {
+            val bmp = withContext(Dispatchers.Default) {
+                app.revela.render.ThumbRender.forEdits(b, stack, stack.edits, geometry.quarterTurns, 256)
+            }
+            val stream = ByteArrayOutputStream()
+            bmp.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, stream)
+            SessionIndexStore.saveThumb(
+                context.filesDir,
+                SessionIndexStore.idFor(u.toString()),
+                stream.toByteArray()
+            )
+        }
+    }
+
     fun persistSession() {
         val u = sourceUri ?: return
         SessionStore.save(context, u, stack, geometry)
+        SessionIndexStore.upsert(context.filesDir, u.toString(), stack, geometry)
+        thumbJob?.cancel()
+        thumbJob = scope.launch {
+            delay(400)
+            flushThumb()
+        }
     }
 
     /** Ajuste de trabajo para un parametro de Ajustar (WB conserva el campo no tocado). */
@@ -445,6 +518,11 @@ fun EditorScreen() {
         ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
             scope.launch {
                 val t0 = android.os.SystemClock.elapsedRealtime()
                 val loaded = PreviewRender.decode(context.contentResolver, uri)
@@ -485,6 +563,29 @@ fun EditorScreen() {
                 if (loaded != null) overlayImage = loaded
             }
         }
+    }
+
+    // Carga inicial al venir de la HOME (foto nueva o sesion guardada)
+    var initialLoadDone by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (initialLoadDone) return@LaunchedEffect
+        initialLoadDone = true
+        val target = initialUri ?: return@LaunchedEffect
+        val loaded = PreviewRender.decode(context.contentResolver, target)
+        if (loaded == null) {
+            android.util.Log.w("revela", "no se pudo abrir $target")
+            Toast.makeText(context, "No se pudo abrir la foto", Toast.LENGTH_SHORT).show()
+            onHome()
+            return@LaunchedEffect
+        }
+        base = loaded
+        originalBitmap = loaded.toBitmap()
+        sourceUri = target
+        val restored = initialSessionId?.let { SessionIndexStore.load(context.filesDir, it) }
+            ?: SessionStore.load(context, target)
+        stack = restored?.first ?: EditStack()
+        geometry = restored?.second ?: GeometryModel()
+        stackVersion++
     }
 
     LaunchedEffect(base, stackVersion, workingAdj, workingPoint, workingVignette, activeTool, showOriginal, tuneParam, workingEdit, workingPresetIntensity, overlayImage) {
@@ -570,6 +671,15 @@ fun EditorScreen() {
                 .padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(onClick = {
+                thumbJob?.cancel()
+                scope.launch {
+                    persistSession()
+                    thumbJob?.cancel()
+                    flushThumb()
+                    onHome()
+                }
+            }) { Icon(Icons.Filled.Home, "Biblioteca", tint = Color.White) }
             IconButton(onClick = {
                 pickerLauncher.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -1875,14 +1985,6 @@ fun EditorScreen() {
                                     onExport = { showExportDialog = true }
                                 )
             }
-        }
-        if (showWelcome) {
-            WelcomeWizard(
-                onFinish = {
-                    WelcomeStore.markSeen(context.filesDir)
-                    showWelcome = false
-                }
-            )
         }
     }
 
