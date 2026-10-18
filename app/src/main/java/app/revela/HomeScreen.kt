@@ -110,7 +110,7 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Ui.bg)
             .statusBarsPadding()
     ) {
         Row(
@@ -121,7 +121,7 @@ fun HomeScreen(
         ) {
             Text(
                 "revela",
-                color = Color.White,
+                color = Ui.text,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.SemiBold
             )
@@ -131,7 +131,7 @@ fun HomeScreen(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                 )
             }) {
-                Icon(Icons.Filled.AddPhotoAlternate, "Abrir foto", tint = Color.White)
+                Icon(Icons.Filled.AddPhotoAlternate, "Abrir foto", tint = Ui.icon)
             }
         }
 
@@ -144,7 +144,7 @@ fun HomeScreen(
             ) {
                 Text(
                     "Todavia no hay ediciones.\nAbre una foto con el boton +.",
-                    color = Color(0xFF8A8A8A),
+                    color = Ui.textDim,
                     fontSize = 15.sp,
                     lineHeight = 22.sp
                 )
@@ -164,7 +164,7 @@ fun HomeScreen(
                                 .fillMaxWidth()
                                 .aspectRatio(1f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF1B1B1B))
+                                .background(Ui.card)
                                 .clickable { onOpenSession(entry) }
                         ) {
                             val thumb = thumbs[entry.id]
@@ -179,7 +179,7 @@ fun HomeScreen(
                                 Icon(
                                     Icons.Filled.Image,
                                     contentDescription = null,
-                                    tint = Color(0xFF555555),
+                                    tint = Ui.line,
                                     modifier = Modifier
                                         .align(Alignment.Center)
                                         .size(36.dp)
@@ -191,19 +191,19 @@ fun HomeScreen(
                                     .align(Alignment.TopEnd)
                                     .padding(4.dp)
                                     .size(30.dp)
-                                    .background(Color(0x99000000), CircleShape)
+                                    .background(Ui.textDim, CircleShape)
                             ) {
                                 Icon(
                                     Icons.Filled.Delete,
                                     contentDescription = "Eliminar sesion",
-                                    tint = Color.White,
+                                    tint = Ui.icon,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
                         Text(
                             entry.displayName,
-                            color = Color.White,
+                            color = Ui.text,
                             fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -211,7 +211,7 @@ fun HomeScreen(
                         )
                         Text(
                             relativeTime(entry.lastOpenedAt),
-                            color = Color(0xFF8A8A8A),
+                            color = Ui.textDim,
                             fontSize = 10.sp,
                             maxLines = 1
                         )
@@ -224,7 +224,7 @@ fun HomeScreen(
     confirmDelete?.let { entry ->
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
-            containerColor = Color(0xFF1E1E1E),
+            containerColor = Ui.panel,
             title = { Text("Eliminar edicion", color = Color.White) },
             text = {
                 Text(
@@ -237,7 +237,7 @@ fun HomeScreen(
                     SessionIndexStore.delete(context.filesDir, entry.id)
                     confirmDelete = null
                     reload()
-                }) { Text("Eliminar", color = Color(0xFFE57373)) }
+                }) { Text("Eliminar", color = Color(0xFFD32F2F)) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmDelete = null }) { Text("Cancelar", color = Color.White) }

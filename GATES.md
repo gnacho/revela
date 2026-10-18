@@ -103,3 +103,8 @@ Scope: FASE 11 completa en 5 paquetes ordenados: HOME (biblioteca de sesiones pe
   CHECK: ./gradlew assembleRelease -q > /dev/null 2>&1 && python3 ~/temp/opencode-work/revela-gates/g18.py 2>&1 | tail -1
   EXPECT: LOOKANIM_OK
   EVIDENCE: automatic-evidence=v1; definition-sha256=92aa4f66955fba7d5ef3514994749f45067151672038ae64b550b350459b7b9a; exit=0; EXPECT=matched; output-sha256=35e6e012a39d9dccb1284a2997d7fa17a98a98e483e351631eb8302fa64728a1; output-bytes=11; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git
+
+- [x] G19: Rediseño UI claro estilo Snapseed: rejilla 5 col sin tarjetas, iconos outline, hoja blanca, pestañas de texto con azul, foto con margen, status bar clara; banco funcional completo en verde tras el tema
+  CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && ./gradlew assembleRelease -q > /dev/null 2>&1 && python3 ~/temp/opencode-work/revela-gates/g14.py 2>&1 | tail -1 && python3 ~/temp/opencode-work/revela-gates/g16.py 2>&1 | tail -1 && python3 ~/temp/opencode-work/revela-gates/g18.py 2>&1 | tail -1
+  EXPECT: HOME_GATE_OK + GRID28_OK + LOOKANIM_OK
+  EVIDENCE: ejecutado 19-Oct-2026; g14, g15, g16, g16func y g18 todos OK tras el tema claro (106/106 tests + banco emulador)

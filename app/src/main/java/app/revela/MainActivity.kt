@@ -179,6 +179,45 @@ import androidx.compose.material.icons.filled.Transform
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.FaceRetouchingNatural
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.AspectRatio
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.BlurOn
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.Brush
+import androidx.compose.material.icons.outlined.CenterFocusStrong
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Contrast
+import androidx.compose.material.icons.outlined.Crop
+import androidx.compose.material.icons.outlined.CropFree
+import androidx.compose.material.icons.outlined.Details
+import androidx.compose.material.icons.outlined.Face
+import androidx.compose.material.icons.outlined.FaceRetouchingNatural
+import androidx.compose.material.icons.outlined.Flare
+import androidx.compose.material.icons.outlined.HdrStrong
+import androidx.compose.material.icons.outlined.Healing
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.RotateRight
+import androidx.compose.material.icons.outlined.ShowChart
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.outlined.TextFields
+import androidx.compose.material.icons.outlined.Texture
+import androidx.compose.material.icons.outlined.Tonality
+import androidx.compose.material.icons.outlined.Transform
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Vignette
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.material.icons.automirrored.outlined.Undo
+import androidx.compose.material.icons.automirrored.outlined.Redo
+import androidx.compose.material.icons.outlined.FilterBAndW
 import androidx.compose.ui.graphics.asAndroidBitmap
 import java.io.ByteArrayOutputStream
 
@@ -187,7 +226,7 @@ enum class EditorTool(val id: String, val label: String) {
     CURVES(Tool.CURVES, "Curvas"),
     TONE(Tool.TONAL, "Contraste tonal"),
     VIGNETTE(Tool.VIGNETTE, "Vineta"),
-    HEAL(Tool.HEAL, "Quitamanchas"),
+    HEAL(Tool.HEAL, "Corrector"),
     CROP(Tool.CROP, "Recortar"),
     ROTATE("rotate", "Girar"),
     PERSPECTIVE(Tool.PERSPECTIVE, "Perspectiva"),
@@ -285,8 +324,59 @@ fun perspMoveHandle(
     }
 }
 
-/** Pestañas inferiores estilo Snapseed. */
+/** Pestañas inferiores disponibles. */
 enum class BottomTab { NONE, LOOKS, TOOLS }
+
+/** Pestañas inferiores estilo Snapseed: texto plano en mayúsculas, seleccionado en azul. */
+@Composable
+fun BottomTabs(
+    selected: BottomTab,
+    enabled: Boolean,
+    onSelect: (BottomTab) -> Unit,
+    onExport: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Ui.card)
+            .padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        TabButton(
+            "ESTILOS", selected == BottomTab.LOOKS, enabled, Modifier.weight(1f)
+        ) { onSelect(if (selected == BottomTab.LOOKS) BottomTab.NONE else BottomTab.LOOKS) }
+        TabButton(
+            "HERRAMIENTAS", selected == BottomTab.TOOLS, enabled, Modifier.weight(1f)
+        ) { onSelect(if (selected == BottomTab.TOOLS) BottomTab.NONE else BottomTab.TOOLS) }
+        TabButton("EXPORTAR", false, enabled, Modifier.weight(1f)) { onExport() }
+    }
+}
+
+@Composable
+fun TabButton(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Text(
+        label,
+        color = when {
+            !enabled -> Ui.line
+            selected -> Ui.accent
+            else -> Ui.textDim
+        },
+        fontSize = 14.sp,
+        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        letterSpacing = 1.sp,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(vertical = 4.dp)
+    )
+}
 
 /** Parametros de la herramienta Ajustar (gesto vertical para elegir, horizontal para valor). */
 enum class TuneParam(val toolId: String, val wbParam: WbParam, val label: String) {
@@ -304,8 +394,28 @@ enum class SelParam(val label: String) {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge(
+            statusBarStyle = androidx.activity.SystemBarStyle.light(
+                android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT
+            ),
+            navigationBarStyle = androidx.activity.SystemBarStyle.light(
+                android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT
+            )
+        )
         setContent {
-            MaterialTheme {
+            MaterialTheme(
+                colorScheme = androidx.compose.material3.lightColorScheme(
+                    primary = Ui.accent,
+                    onPrimary = androidx.compose.ui.graphics.Color.White,
+                    secondary = Ui.accent,
+                    surface = Ui.card,
+                    onSurface = Ui.text,
+                    surfaceVariant = Ui.panel,
+                    onSurfaceVariant = Ui.textDim,
+                    background = Ui.bg,
+                    onBackground = Ui.text
+                )
+            ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val context = LocalContext.current
                     var screen by remember { mutableStateOf("home") }
@@ -792,7 +902,7 @@ fun EditorScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
+                .background(Ui.bg)
                 .statusBarsPadding()
         ) {
             // Barra superior
@@ -810,13 +920,19 @@ fun EditorScreen(
                     flushThumb()
                     onHome()
                 }
-            }) { Icon(Icons.Filled.Home, "Biblioteca", tint = Color.White) }
-            IconButton(onClick = {
+            }) { Icon(Icons.Outlined.Home, "Biblioteca", tint = Ui.icon) }
+            TextButton(onClick = {
                 pickerLauncher.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                 )
             }) {
-                Icon(Icons.Filled.AddPhotoAlternate, "Abrir foto", tint = Color.White)
+                Text(
+                    "ABRIR",
+                    color = Ui.textDim,
+                    fontSize = 16.sp,
+                    letterSpacing = 1.sp,
+                    fontWeight = FontWeight.Medium
+                )
             }
             Spacer(Modifier.weight(1f))
 
@@ -829,7 +945,7 @@ fun EditorScreen(
                         }
                     },
                     enabled = stack.canUndo
-                ) { Icon(Icons.AutoMirrored.Filled.Undo, "Deshacer", tint = Color.White) }
+                ) { Icon(Icons.AutoMirrored.Outlined.Undo, "Deshacer", tint = Ui.icon) }
                 IconButton(
                     onClick = {
                         if (stack.redo()) {
@@ -838,7 +954,7 @@ fun EditorScreen(
                         }
                     },
                     enabled = stack.canRedo
-                ) { Icon(Icons.AutoMirrored.Filled.Redo, "Rehacer", tint = Color.White) }
+                ) { Icon(Icons.AutoMirrored.Outlined.Redo, "Rehacer", tint = Ui.icon) }
                 IconButton(
                     onClick = {},
                     modifier = Modifier.pointerInput(sourceUri) {
@@ -850,12 +966,12 @@ fun EditorScreen(
                             }
                         )
                     }
-                ) { Icon(Icons.Filled.Visibility, "Comparar con el original", tint = Color.White) }
+                ) { Icon(Icons.Outlined.Visibility, "Comparar con el original", tint = Ui.icon) }
                 Box {
                     IconButton(
                         onClick = { showMenu = true },
                         enabled = sourceUri != null
-                    ) { Icon(Icons.Filled.MoreVert, "Menu", tint = Color.White) }
+                    ) { Icon(Icons.Outlined.MoreVert, "Menu", tint = Ui.icon) }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                         DropdownMenuItem(
                             text = { Text("Revertir todo") },
@@ -880,7 +996,7 @@ fun EditorScreen(
                     strokeY.clear()
                     workingEdit = null
                     workingPresetIntensity = Float.NaN
-                }) { Icon(Icons.Filled.Close, "Cerrar herramienta", tint = Color.White) }
+                }) { Icon(Icons.Outlined.Close, "Cerrar herramienta", tint = Ui.icon) }
                 IconButton(onClick = {
                     when (activeTool) {
                         EditorTool.CROP -> {
@@ -931,7 +1047,7 @@ fun EditorScreen(
                     activeTool = null
                     workingEdit = null
                     workingPresetIntensity = Float.NaN
-                }) { Icon(Icons.Filled.Check, "Listo", tint = Color.White) }
+                }) { Icon(Icons.Outlined.Check, "Listo", tint = Ui.icon) }
             }
         }
         if (activeTool == null && base != null) {
@@ -946,7 +1062,8 @@ fun EditorScreen(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             contentAlignment = Alignment.Center
         ) {
             val density = LocalDensity.current
@@ -1546,7 +1663,7 @@ fun EditorScreen(
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.45f))
+                            .background(Color.Black.copy(alpha = 0.2f))
                             .pointerInput(Unit) {
                                 detectTapGestures { bottomTab = BottomTab.NONE }
                             }
@@ -1634,8 +1751,8 @@ fun EditorScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(label, color = Color.Gray, fontSize = 11.sp)
-                        Text(valueText, color = Color.White, fontSize = 12.sp)
+                        Text(label, color = Ui.textDim, fontSize = 11.sp)
+                        Text(valueText, color = Ui.text, fontSize = 12.sp)
                     }
                     val span = range.endInclusive - range.start
                     val frac = if (span > 0) ((shown - range.start) / span).coerceIn(0f, 1f) else 0f
@@ -1717,7 +1834,7 @@ fun EditorScreen(
                                 EditorTool.SELECTIVE -> Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFF101014))
+                                        .background(Ui.panel)
                                         .padding(8.dp)
                                 ) {
                                     Row(
@@ -1738,7 +1855,7 @@ fun EditorScreen(
                                     }
                                     Text(
                                         "Toca para anadir punto (max 8) - arrastra el punto para moverlo - pulsacion larga para borrar - desliza en horizontal para ajustar",
-                                        color = Color.Gray,
+                                        color = Ui.textDim,
                                         fontSize = 11.sp,
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier.fillMaxWidth()
@@ -1748,7 +1865,7 @@ fun EditorScreen(
                                 EditorTool.VIGNETTE -> Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFF101014))
+                                        .background(Ui.panel)
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     val currentV = if (workingVignette.isNaN()) {
@@ -1756,7 +1873,7 @@ fun EditorScreen(
                                     } else workingVignette
                                     Text(
                                         "Intensidad: ${(currentV * 100).toInt()}%",
-                                        color = Color.White,
+                                        color = Ui.text,
                                         fontSize = 13.sp
                                     )
                                     Slider(
@@ -1786,12 +1903,12 @@ fun EditorScreen(
                                 EditorTool.HEAL -> Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFF101014))
+                                        .background(Ui.panel)
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
                                         "Brocha: ${(brushSize * 100).toInt()}%",
-                                        color = Color.White,
+                                        color = Ui.text,
                                         fontSize = 13.sp
                                     )
                                     Slider(
@@ -1828,12 +1945,12 @@ fun EditorScreen(
                                 EditorTool.PERSPECTIVE -> Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFF101014))
+                                        .background(Ui.panel)
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
                                         "Perspectiva: arrastra los puntos azules sobre la foto",
-                                        color = Color.White,
+                                        color = Ui.text,
                                         fontSize = 13.sp
                                     )
                                     Row(
@@ -1868,7 +1985,7 @@ fun EditorScreen(
                                     if (perspMode == "rotate") {
                                         Text(
                                             "Horizontal ${perspYaw.toInt()} grados",
-                                            color = Color.White, fontSize = 12.sp
+                                            color = Ui.text, fontSize = 12.sp
                                         )
                                         Slider(
                                             value = perspYaw,
@@ -1884,7 +2001,7 @@ fun EditorScreen(
                                         )
                                         Text(
                                             "Vertical ${perspPitch.toInt()} grados",
-                                            color = Color.White, fontSize = 12.sp
+                                            color = Ui.text, fontSize = 12.sp
                                         )
                                         Slider(
                                             value = perspPitch,
@@ -1900,7 +2017,7 @@ fun EditorScreen(
                                         )
                                         Text(
                                             "Rotacion ${perspRoll.toInt()} grados",
-                                            color = Color.White, fontSize = 12.sp
+                                            color = Ui.text, fontSize = 12.sp
                                         )
                                         Slider(
                                             value = perspRoll,
@@ -1925,12 +2042,12 @@ fun EditorScreen(
                                 EditorTool.EXPAND -> Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFF101014))
+                                        .background(Ui.panel)
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
                                         "Expandir: arrastra los puntos azules hacia fuera para ampliar el lienzo",
-                                        color = Color.White,
+                                        color = Ui.text,
                                         fontSize = 13.sp
                                     )
                                     Row(
@@ -1957,12 +2074,12 @@ fun EditorScreen(
                                 EditorTool.BRUSH -> Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFF101014))
+                                        .background(Ui.panel)
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
                                         "Brocha: ${(brushSize * 100).toInt()}%  |  Intensidad: ${(brushAmount * 100).toInt()}%",
-                                        color = Color.White,
+                                        color = Ui.text,
                                         fontSize = 13.sp
                                     )
                                     Slider(
@@ -2022,7 +2139,7 @@ fun EditorScreen(
                                 EditorTool.HEAD_POSE -> Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFF101014))
+                                        .background(Ui.panel)
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
@@ -2032,12 +2149,12 @@ fun EditorScreen(
                                             2 -> "Paso 3: toca la boca"
                                             else -> "Ajusta el giro o arrastra los puntos azules"
                                         },
-                                        color = Color.White,
+                                        color = Ui.text,
                                         fontSize = 13.sp
                                     )
                                     Text(
                                         "Giro horizontal ${hpYawDeg.toInt()} grados",
-                                        color = Color.White, fontSize = 12.sp
+                                        color = Ui.text, fontSize = 12.sp
                                     )
                                     Slider(
                                         value = hpYawDeg,
@@ -2046,7 +2163,7 @@ fun EditorScreen(
                                     )
                                     Text(
                                         "Giro vertical ${hpPitchDeg.toInt()} grados",
-                                        color = Color.White, fontSize = 12.sp
+                                        color = Ui.text, fontSize = 12.sp
                                     )
                                     Slider(
                                         value = hpPitchDeg,
@@ -2101,7 +2218,7 @@ fun EditorScreen(
                                 EditorTool.TUNE -> Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFF101014))
+                                        .background(Ui.panel)
                                         .padding(vertical = 8.dp)
                                 ) {
                                     Row(
@@ -2114,7 +2231,7 @@ fun EditorScreen(
                                             Icon(
                                                 Icons.Filled.AutoFixHigh,
                                                 contentDescription = "Auto",
-                                                tint = Color.White
+                                                tint = Ui.icon
                                             )
                                         }
                                         Spacer(Modifier.width(10.dp))
@@ -2132,7 +2249,7 @@ fun EditorScreen(
                                                 .padding(horizontal = 12.dp, vertical = 2.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text("Auto ajustado", color = Color.White, fontSize = 13.sp)
+                                            Text("Auto ajustado", color = Ui.text, fontSize = 13.sp)
                                             Spacer(Modifier.weight(1f))
                                             TextButton(onClick = { undoAuto() }) { Text("Deshacer") }
                                         }
@@ -2157,7 +2274,7 @@ fun EditorScreen(
                                     }
                                     Text(
                                         "Arrastra en vertical para elegir parametro - en horizontal para ajustar",
-                                        color = Color.Gray,
+                                        color = Ui.textDim,
                                         fontSize = 11.sp,
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier.fillMaxWidth()
@@ -2167,7 +2284,7 @@ fun EditorScreen(
                                 EditorTool.ROTATE -> Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFF101014))
+                                        .background(Ui.panel)
                                         .padding(vertical = 10.dp)
                                 ) {
                                     Row(
@@ -2175,20 +2292,20 @@ fun EditorScreen(
                                         horizontalArrangement = Arrangement.Center
                                     ) {
                                         OutlinedButton(onClick = { rotateBy(-1) }) {
-                                            Icon(Icons.Filled.RotateLeft, contentDescription = null, tint = Color.White)
+                                            Icon(Icons.Filled.RotateLeft, contentDescription = null, tint = Ui.icon)
                                             Spacer(Modifier.width(6.dp))
-                                            Text("90 izq", color = Color.White)
+                                            Text("90 izq", color = Ui.text)
                                         }
                                         Spacer(Modifier.width(16.dp))
                                         OutlinedButton(onClick = { rotateBy(1) }) {
-                                            Icon(Icons.Filled.RotateRight, contentDescription = null, tint = Color.White)
+                                            Icon(Icons.Filled.RotateRight, contentDescription = null, tint = Ui.icon)
                                             Spacer(Modifier.width(6.dp))
-                                            Text("90 der", color = Color.White)
+                                            Text("90 der", color = Ui.text)
                                         }
                                     }
                                     Text(
                                         "Gira el marco en cuartos de vuelta. El enderece fino esta en Recortar.",
-                                        color = Color.Gray,
+                                        color = Ui.textDim,
                                         fontSize = 11.sp,
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier
@@ -2202,7 +2319,7 @@ fun EditorScreen(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .background(Color(0xFF101014))
+                                            .background(Ui.panel)
                                             .padding(vertical = 8.dp)
                                     ) {
                                         Row(
@@ -2242,7 +2359,7 @@ fun EditorScreen(
                                         }
                                         Text(
                                             "Cada filtro pondera los canales al pasar a blanco y negro.",
-                                            color = Color.Gray,
+                                            color = Ui.textDim,
                                             fontSize = 11.sp,
                                             textAlign = TextAlign.Center,
                                             modifier = Modifier.fillMaxWidth()
@@ -2253,7 +2370,7 @@ fun EditorScreen(
                                 EditorTool.TONE -> Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFF101014))
+                                        .background(Ui.panel)
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     TonalSlider("Sombras", effective().tonalShadows) { v ->
@@ -2274,7 +2391,7 @@ fun EditorScreen(
                                             stackVersion++
                                             workingAdj = null
                                             persistSession()
-                                        }) { Text("Restablecer", color = Color.Gray) }
+                                        }) { Text("Restablecer", color = Ui.textDim) }
                                         Spacer(Modifier.width(16.dp))
                                         Button(onClick = {
                                             commitTonal()
@@ -2286,7 +2403,7 @@ fun EditorScreen(
                                 EditorTool.WB -> Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFF101014))
+                                        .background(Ui.panel)
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     TonalSlider("Temperatura", effective().temperature) { v ->
@@ -2304,7 +2421,7 @@ fun EditorScreen(
                                             stackVersion++
                                             workingAdj = null
                                             persistSession()
-                                        }) { Text("Restablecer", color = Color.Gray) }
+                                        }) { Text("Restablecer", color = Ui.textDim) }
                                         Spacer(Modifier.width(16.dp))
                                         Button(onClick = {
                                             val cur = effective()
@@ -2325,7 +2442,7 @@ fun EditorScreen(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .background(Color(0xFF101014))
+                                            .background(Ui.panel)
                                             .padding(horizontal = 16.dp, vertical = 8.dp)
                                     ) {
                                         TonalSlider("Estructura", cur.structure) { v ->
@@ -2426,7 +2543,7 @@ fun EditorScreen(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .background(Color(0xFF101014))
+                                            .background(Ui.panel)
                                             .padding(horizontal = 16.dp, vertical = 8.dp)
                                     ) {
                                         Row(
@@ -2464,11 +2581,11 @@ fun EditorScreen(
                                             Spacer(Modifier.width(8.dp))
                                             Text(
                                                 if (overlayImage != null) "Cargada" else "Sin imagen",
-                                                color = Color.Gray,
+                                                color = Ui.textDim,
                                                 fontSize = 12.sp
                                             )
                                         }
-                                        Text("Opacidad: ${(cur.opacity * 100).toInt()}%", color = Color.White, fontSize = 13.sp)
+                                        Text("Opacidad: ${(cur.opacity * 100).toInt()}%", color = Ui.text, fontSize = 13.sp)
                                         Slider(
                                             value = cur.opacity,
                                             onValueChange = { workingEdit = cur.copy(opacity = it) },
@@ -2476,7 +2593,7 @@ fun EditorScreen(
                                         )
                                         Text(
                                             "Escala capa: ${(cur.scale * 100).toInt()}%  |  Rotacion: ${cur.rotationDeg.toInt()} grados",
-                                            color = Color.White, fontSize = 13.sp
+                                            color = Ui.text, fontSize = 13.sp
                                         )
                                         Slider(
                                             value = cur.scale,
@@ -2490,7 +2607,7 @@ fun EditorScreen(
                                         )
                                         Text(
                                             "Arrastra la foto para mover la 2a capa",
-                                            color = Color(0xFF9E9E9E), fontSize = 12.sp
+                                            color = Ui.textDim, fontSize = 12.sp
                                         )
                                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                             OutlinedButton(onClick = {
@@ -2512,7 +2629,7 @@ fun EditorScreen(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .background(Color(0xFF101014))
+                                            .background(Ui.panel)
                                             .padding(horizontal = 16.dp, vertical = 8.dp)
                                     ) {
                                         OutlinedTextField(
@@ -2537,7 +2654,7 @@ fun EditorScreen(
                                                 )
                                             }
                                         }
-                                        Text("Tamano: ${(cur.sizePct * 100).toInt()}%", color = Color.White, fontSize = 13.sp)
+                                        Text("Tamano: ${(cur.sizePct * 100).toInt()}%", color = Ui.text, fontSize = 13.sp)
                                         Slider(
                                             value = cur.sizePct,
                                             onValueChange = { workingEdit = cur.copy(sizePct = it) },
@@ -2576,7 +2693,7 @@ fun EditorScreen(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .background(Color(0xFF101014))
+                                            .background(Ui.panel)
                                             .padding(horizontal = 16.dp, vertical = 8.dp)
                                     ) {
                                         Row(
@@ -2594,7 +2711,7 @@ fun EditorScreen(
                                                 )
                                             }
                                         }
-                                        Text("Grosor: ${(cur.widthPct * 100).toInt()}%", color = Color.White, fontSize = 13.sp)
+                                        Text("Grosor: ${(cur.widthPct * 100).toInt()}%", color = Ui.text, fontSize = 13.sp)
                                         Slider(
                                             value = cur.widthPct,
                                             onValueChange = { workingEdit = cur.copy(widthPct = it) },
@@ -2621,7 +2738,7 @@ fun EditorScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF101014))
+                    .background(Ui.panel)
                     .navigationBarsPadding()
             ) {
                                 BottomTabs(
@@ -2766,7 +2883,7 @@ fun CurvesPanel(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF101014))
+            .background(Ui.panel)
             .navigationBarsPadding()
             .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -2800,7 +2917,7 @@ fun CurveEditor(points: List<CurvePoint>, onChange: (List<CurvePoint>) -> Unit) 
         modifier = Modifier
             .width(side)
             .height(side)
-            .background(Color(0xFF1A1A20))
+            .background(Ui.panel)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = { pos ->
@@ -2870,8 +2987,8 @@ fun CurveEditor(points: List<CurvePoint>, onChange: (List<CurvePoint>) -> Unit) 
         Canvas(Modifier.matchParentSize()) {
             val s = size.minDimension
             for (f in listOf(0.25f, 0.5f, 0.75f)) {
-                drawLine(Color(0xFF333340), Offset(s * f, 0f), Offset(s * f, s))
-                drawLine(Color(0xFF333340), Offset(0f, s * f), Offset(s, s * f))
+                drawLine(Ui.line, Offset(s * f, 0f), Offset(s * f, s))
+                drawLine(Ui.line, Offset(0f, s * f), Offset(s, s * f))
             }
             drawLine(Color(0xFF44444F), Offset(0f, s), Offset(s, 0f))
             val lut = app.revela.core.CurveMath.lut(pointsRef.value)
@@ -2906,7 +3023,7 @@ fun CropPanel(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF101014))
+            .background(Ui.panel)
             .navigationBarsPadding()
             .padding(12.dp)
     ) {
@@ -2970,7 +3087,7 @@ fun CropPanel(
                         cropLeft = 0f, cropTop = 0f, cropRight = 1f, cropBottom = 1f
                     )
                 )
-            }) { Icon(Icons.Filled.RotateLeft, "Rotar a la izquierda", tint = Color.White) }
+            }) { Icon(Icons.Filled.RotateLeft, "Rotar a la izquierda", tint = Ui.icon) }
             IconButton(onClick = {
                 onChange(
                     geometry.copy(
@@ -2979,9 +3096,9 @@ fun CropPanel(
                         cropLeft = 0f, cropTop = 0f, cropRight = 1f, cropBottom = 1f
                     )
                 )
-            }) { Icon(Icons.Filled.RotateRight, "Rotar a la derecha", tint = Color.White) }
+            }) { Icon(Icons.Filled.RotateRight, "Rotar a la derecha", tint = Ui.icon) }
             IconButton(onClick = { onChange(GeometryModel()) }) {
-                Icon(Icons.Filled.RestartAlt, "Restablecer geometria", tint = Color.White)
+                Icon(Icons.Filled.RestartAlt, "Restablecer geometria", tint = Ui.icon)
             }
             Button(onClick = onCommit) { Text("OK") }
             Spacer(Modifier.width(6.dp))
@@ -2991,7 +3108,7 @@ fun CropPanel(
             modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Enderezar", color = Color.White, fontSize = 13.sp)
+            Text("Enderezar", color = Ui.text, fontSize = 13.sp)
             Slider(
                 value = geometry.straightenDeg,
                 onValueChange = { onChange(geometry.copy(straightenDeg = it)) },
@@ -3269,7 +3386,7 @@ fun ExportDialog(
                 Text(
                     "Se guarda en Imagenes/revela (max 4096 px de lado).",
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = Ui.textDim
                 )
             }
         },
@@ -3284,78 +3401,36 @@ fun ExportDialog(
     )
 }
 
-/** Barra inferior de 3 pestañas estilo Snapseed: Estilos | Herramientas | Exportar. */
-@Composable
-fun BottomTabs(
-    selected: BottomTab,
-    enabled: Boolean,
-    onSelect: (BottomTab) -> Unit,
-    onExport: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        TabButton(
-            "Estilos", selected == BottomTab.LOOKS, enabled, Modifier.weight(1f)
-        ) { onSelect(if (selected == BottomTab.LOOKS) BottomTab.NONE else BottomTab.LOOKS) }
-        TabButton(
-            "Herramientas", selected == BottomTab.TOOLS, enabled, Modifier.weight(1f)
-        ) { onSelect(if (selected == BottomTab.TOOLS) BottomTab.NONE else BottomTab.TOOLS) }
-        TabButton("Exportar", false, enabled, Modifier.weight(1f)) { onExport() }
-    }
-}
-
-@Composable
-fun TabButton(
-    label: String,
-    selected: Boolean,
-    enabled: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    TextButton(onClick = onClick, modifier = modifier, enabled = enabled) {
-        Text(
-            label,
-            color = if (selected) Color.White else Color(0xFF9E9E9E),
-            fontSize = 14.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-        )
-    }
-}
-
-/** Catalogo completo de herramientas (28, orden Snapseed) compartido por rejilla y barra de favoritos. */
+/** Catalogo completo de herramientas (28, orden Snapseed) compartido por rejilla y barra de favoritos. Iconos outline estilo Snapseed. */
 fun toolCatalog(): List<Triple<EditorTool, androidx.compose.ui.graphics.vector.ImageVector, String>> = listOf(
-    Triple(EditorTool.TUNE, Icons.Filled.Tune, "Ajustar imagen"),
-    Triple(EditorTool.DETAILS, Icons.Filled.Details, "Detalles"),
-    Triple(EditorTool.CURVES, Icons.Filled.ShowChart, "Curvas"),
-    Triple(EditorTool.WB, Icons.Filled.WbSunny, "Balance blancos"),
-    Triple(EditorTool.CROP, Icons.Filled.Crop, "Recortar"),
-    Triple(EditorTool.ROTATE, Icons.Filled.RotateRight, "Girar"),
-    Triple(EditorTool.PERSPECTIVE, Icons.Filled.Transform, "Perspectiva"),
-    Triple(EditorTool.EXPAND, Icons.Filled.AspectRatio, "Expandir"),
-    Triple(EditorTool.SELECTIVE, Icons.Filled.CenterFocusStrong, "Selectivo"),
-    Triple(EditorTool.BRUSH, Icons.Filled.Brush, "Pincel"),
-    Triple(EditorTool.HEAL, Icons.Filled.Healing, "Quitamanchas"),
-    Triple(EditorTool.HDR, Icons.Filled.HdrStrong, "HDR-scape"),
-    Triple(EditorTool.GLOW, Icons.Filled.AutoAwesome, "Brillo glamuroso"),
-    Triple(EditorTool.TONE, Icons.Filled.Tonality, "Contraste tonal"),
-    Triple(EditorTool.DRAMA, Icons.Filled.Bolt, "Drama"),
-    Triple(EditorTool.VINTAGE, Icons.Filled.PhotoCamera, "Vintage"),
-    Triple(EditorTool.GRAINY_FILM, Icons.Filled.Movie, "Pelicula granulada"),
-    Triple(EditorTool.RETROLUX, Icons.Filled.Flare, "Retrolux"),
-    Triple(EditorTool.GRUNGE, Icons.Filled.Texture, "Grunge"),
-    Triple(EditorTool.BNW, Icons.Filled.FilterBAndW, "B/N"),
-    Triple(EditorTool.NOIR, Icons.Filled.Contrast, "Noir"),
-    Triple(EditorTool.PORTRAIT, Icons.Filled.Face, "Retrato"),
-    Triple(EditorTool.HEAD_POSE, Icons.Filled.FaceRetouchingNatural, "Pose"),
-    Triple(EditorTool.LENS_BLUR, Icons.Filled.BlurOn, "Desenfoque"),
-    Triple(EditorTool.VIGNETTE, Icons.Filled.Vignette, "Vineta"),
-    Triple(EditorTool.DOUBLE_EXPO, Icons.Filled.Layers, "Doble exposicion"),
-    Triple(EditorTool.TEXT, Icons.Filled.TextFields, "Texto"),
-    Triple(EditorTool.FRAME, Icons.Filled.CropFree, "Marcos")
+    Triple(EditorTool.TUNE, Icons.Outlined.Tune, "Ajustar imagen"),
+    Triple(EditorTool.DETAILS, Icons.Outlined.Details, "Detalles"),
+    Triple(EditorTool.CURVES, Icons.Outlined.ShowChart, "Curvas"),
+    Triple(EditorTool.WB, Icons.Outlined.WbSunny, "Balance blancos"),
+    Triple(EditorTool.CROP, Icons.Outlined.Crop, "Recortar"),
+    Triple(EditorTool.ROTATE, Icons.Outlined.RotateRight, "Girar"),
+    Triple(EditorTool.PERSPECTIVE, Icons.Outlined.Transform, "Perspectiva"),
+    Triple(EditorTool.EXPAND, Icons.Outlined.AspectRatio, "Expandir"),
+    Triple(EditorTool.SELECTIVE, Icons.Outlined.CenterFocusStrong, "Selectivo"),
+    Triple(EditorTool.BRUSH, Icons.Outlined.Brush, "Pincel"),
+    Triple(EditorTool.HEAL, Icons.Outlined.Healing, "Corrector"),
+    Triple(EditorTool.HDR, Icons.Outlined.HdrStrong, "HDR-scape"),
+    Triple(EditorTool.GLOW, Icons.Outlined.AutoAwesome, "Brillo glamuroso"),
+    Triple(EditorTool.TONE, Icons.Outlined.Tonality, "Contraste tonal"),
+    Triple(EditorTool.DRAMA, Icons.Outlined.Bolt, "Drama"),
+    Triple(EditorTool.VINTAGE, Icons.Outlined.PhotoCamera, "Vintage"),
+    Triple(EditorTool.GRAINY_FILM, Icons.Outlined.Movie, "Pelicula granulada"),
+    Triple(EditorTool.RETROLUX, Icons.Outlined.Flare, "Retrolux"),
+    Triple(EditorTool.GRUNGE, Icons.Outlined.Texture, "Grunge"),
+    Triple(EditorTool.BNW, Icons.Outlined.FilterBAndW, "B/N"),
+    Triple(EditorTool.NOIR, Icons.Outlined.Contrast, "Noir"),
+    Triple(EditorTool.PORTRAIT, Icons.Outlined.Face, "Retrato"),
+    Triple(EditorTool.HEAD_POSE, Icons.Outlined.FaceRetouchingNatural, "Pose"),
+    Triple(EditorTool.LENS_BLUR, Icons.Outlined.BlurOn, "Desenfoque"),
+    Triple(EditorTool.VIGNETTE, Icons.Outlined.Vignette, "Vineta"),
+    Triple(EditorTool.DOUBLE_EXPO, Icons.Outlined.Layers, "Doble exposicion"),
+    Triple(EditorTool.TEXT, Icons.Outlined.TextFields, "Texto"),
+    Triple(EditorTool.FRAME, Icons.Outlined.CropFree, "Marcos")
 )
 
 /** Barra de favoritos personalizable: iconos de las herramientas elegidas, siempre bajo la barra superior. */
@@ -3377,7 +3452,7 @@ fun FavoritesBar(
         favorites.forEach { id ->
             val item = catalog.find { it.first.id == id } ?: return@forEach
             IconButton(onClick = { onSelect(item.first) }, modifier = Modifier.size(44.dp)) {
-                Icon(item.second, item.third, tint = Color.White)
+                Icon(item.second, item.third, tint = Ui.icon)
             }
         }
     }
@@ -3397,60 +3472,61 @@ fun ToolsGrid(
             .fillMaxWidth()
             .fillMaxHeight(0.72f)
             .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-            .background(Color(0xFF101014))
+            .background(Ui.sheet)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp, vertical = 16.dp)
+                .padding(horizontal = 6.dp, vertical = 14.dp)
         ) {
-            tools.chunked(3).forEach { rowTools ->
+            tools.chunked(5).forEach { rowTools ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     rowTools.forEach { (tool, icon, label) ->
-                        Card(
-                            onClick = { onSelect(tool) },
-                            modifier = Modifier.weight(1f),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF16161C))
-                        ) {
-                            Box(Modifier.fillMaxWidth()) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 20.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Icon(icon, label, tint = Color.White)
-                                    Text(
-                                        label,
-                                        color = Color.White,
-                                        fontSize = 13.sp,
-                                        modifier = Modifier.padding(top = 8.dp)
-                                    )
-                                }
-                                val fav = tool.id in favorites
-                                IconButton(
-                                    onClick = { onToggleFavorite(tool.id) },
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(2.dp)
-                                        .size(32.dp)
-                                ) {
-                                    Icon(
-                                        if (fav) Icons.Filled.Star else Icons.Filled.StarBorder,
-                                        contentDescription = if (fav) "Quitar de favoritos" else "Anadir a favoritos",
-                                        tint = if (fav) Color(0xFFFFD54F) else Color(0xFF8A8A8A),
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
+                        val fav = tool.id in favorites
+                        Box(modifier = Modifier.weight(1f)) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { onSelect(tool) }
+                                    .padding(vertical = 12.dp)
+                            ) {
+                                Icon(
+                                    icon, label,
+                                    tint = Ui.icon,
+                                    modifier = Modifier.size(30.dp)
+                                )
+                                Text(
+                                    label,
+                                    color = Ui.textDim,
+                                    fontSize = 11.sp,
+                                    lineHeight = 13.sp,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = { onToggleFavorite(tool.id) },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .size(28.dp)
+                            ) {
+                                Icon(
+                                    if (fav) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                    contentDescription = if (fav) "Quitar de favoritos" else "Anadir a favoritos",
+                                    tint = if (fav) Ui.accent else Ui.line,
+                                    modifier = Modifier.size(15.dp)
+                                )
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
             }
         }
     }
@@ -3472,6 +3548,7 @@ fun LooksCarousel(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(Ui.bg)
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -3516,7 +3593,7 @@ fun LooksCarousel(
                             .clip(RoundedCornerShape(8.dp))
                             .border(
                                 width = borderW,
-                                color = Color.White.copy(alpha = borderA),
+                                color = Ui.text.copy(alpha = borderA),
                                 shape = RoundedCornerShape(8.dp)
                             )
                     )
@@ -3524,12 +3601,12 @@ fun LooksCarousel(
                     Box(
                         modifier = Modifier
                             .size(64.dp)
-                            .background(Color(0xFF1A1A20), RoundedCornerShape(8.dp))
+                            .background(Ui.panel, RoundedCornerShape(8.dp))
                     )
                 }
                 Text(
                     look.label,
-                    color = if (sel) Color.White else Color.Gray,
+                    color = if (sel) Ui.text else Ui.textDim,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(top = 4.dp)
                 )
@@ -3575,7 +3652,7 @@ fun LooksCarousel(
                                 .clip(RoundedCornerShape(8.dp))
                                 .border(
                                     width = borderW,
-                                    color = Color(0xFFB388FF).copy(alpha = borderA),
+                                    color = Ui.accent.copy(alpha = borderA),
                                     shape = RoundedCornerShape(8.dp)
                                 )
                         )
@@ -3583,7 +3660,7 @@ fun LooksCarousel(
                         Box(
                             modifier = Modifier
                                 .size(64.dp)
-                                .background(Color(0xFF1A1A20), RoundedCornerShape(8.dp))
+                                .background(Ui.panel, RoundedCornerShape(8.dp))
                         )
                     }
                     Box(
@@ -3595,12 +3672,12 @@ fun LooksCarousel(
                             .clickable { onDeleteCustom(cs) },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("x", color = Color.White, fontSize = 11.sp)
+                        Text("x", color = Ui.text, fontSize = 11.sp)
                     }
                 }
                 Text(
                     cs.name,
-                    color = if (sel) Color(0xFFB388FF) else Color.Gray,
+                    color = if (sel) Ui.accent else Color.Gray,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(top = 4.dp)
                 )
@@ -3616,15 +3693,15 @@ fun LooksCarousel(
             Box(
                 modifier = Modifier
                     .size(64.dp)
-                    .background(Color(0xFF1A1A20), RoundedCornerShape(8.dp))
-                    .border(1.dp, Color(0xFF333340), RoundedCornerShape(8.dp)),
+                    .background(Ui.panel, RoundedCornerShape(8.dp))
+                    .border(1.dp, Ui.line, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("+", color = Color.White, fontSize = 26.sp)
+                Text("+", color = Ui.text, fontSize = 26.sp)
             }
             Text(
                 "Guardar",
-                color = Color.Gray,
+                color = Ui.textDim,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(top = 4.dp)
             )
@@ -3656,11 +3733,11 @@ fun HistogramView(bins: IntArray, modifier: Modifier = Modifier) {
 fun TonalSlider(label: String, value: Float, onChange: (Float) -> Unit) {
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth()) {
-            Text(label, color = Color.White, fontSize = 12.sp)
+            Text(label, color = Ui.text, fontSize = 12.sp)
             Spacer(Modifier.weight(1f))
             Text(
                 if (value >= 0f) "+${"%.1f".format(value)}" else "%.1f".format(value),
-                color = Color.Gray,
+                color = Ui.textDim,
                 fontSize = 12.sp
             )
         }
@@ -3692,10 +3769,10 @@ fun StrengthPanel(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF101014))
+            .background(Ui.panel)
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Text("$label: ${(value * 100).toInt()}%", color = Color.White, fontSize = 13.sp)
+        Text("$label: ${(value * 100).toInt()}%", color = Ui.text, fontSize = 13.sp)
         Slider(
             value = value,
             onValueChange = onValueChange,

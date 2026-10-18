@@ -98,7 +98,7 @@ fun WelcomeWizard(onFinish: () -> Unit) {
                 Spacer(Modifier.height(24.dp))
                 Text(
                     title,
-                    color = Color.White,
+                    color = Ui.text,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
