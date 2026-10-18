@@ -84,10 +84,10 @@ Scope: FASE 11 completa en 5 paquetes ordenados: HOME (biblioteca de sesiones pe
   EXPECT: HOME_GATE_OK
   EVIDENCE: automatic-evidence=v1; definition-sha256=d153b8928842fbb34e70a94fdfa308cdd0e94f2d7f13298c521f8cf46a09c85c; exit=0; EXPECT=matched; output-sha256=197480180233d0335f4d418ba5323ffb92aa7859ceb31751d363e0bcdbc1c98c; output-bytes=12; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git
 
-- [ ] G15: Favoritos: FavoritesStore con test JVM (persiste JSON, orden estable) y barra de favoritos visible bajo la barra superior en release
-  CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && grep -q "FavoritesStoreTest" app/build/test-results/testDebugUnitTest/TEST-app.revela.core.FavoritesStoreTest.xml 2>/dev/null && echo FAV_OK
+- [x] G15: Favoritos: FavoritesStore con test JVM (persiste JSON, orden estable) y barra de favoritos visible bajo la barra superior en release
+  CHECK: ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && grep -q "FavoritesStoreTest" app/build/test-results/testDebugUnitTest/TEST-app.revela.core.FavoritesStoreTest.xml 2>/dev/null && ./gradlew assembleRelease -q > /dev/null 2>&1 && python3 ~/temp/opencode-work/revela-gates/g15.py 2>&1 | tail -1
   EXPECT: FAV_OK
-  EVIDENCE: (pendiente)
+  EVIDENCE: automatic-evidence=v1; definition-sha256=7691dd29aa45e980a198b20a9adb44f86f99d231d9f495d8aa85608d46e1fdbf; exit=0; EXPECT=matched; output-sha256=9a810d253c3b10a3608814a62b21b4caed58cff617c986d0cbc7b1409ae16b6e; output-bytes=6; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git
 
 - [ ] G16: Rejilla 28/28: Perspective, Expandir, Pincel y Pose presentes en la rejilla en release con scroll
   CHECK: (uiautomator dump de la rejilla en release tras implementar; assert las 28 etiquetas presentes)

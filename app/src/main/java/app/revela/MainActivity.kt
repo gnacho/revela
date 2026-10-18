@@ -173,6 +173,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.ui.graphics.asAndroidBitmap
 import java.io.ByteArrayOutputStream
 
@@ -330,6 +332,13 @@ fun EditorScreen(
     var styleName by remember { mutableStateOf("") }
     var deleteStyle by remember { mutableStateOf<CustomStyle?>(null) }
     var selectedCustomId by remember { mutableStateOf<String?>(null) }
+
+    // Barra de favoritos (ids de herramienta, persistidos)
+    var favorites by remember { mutableStateOf(app.revela.core.FavoritesStore.load(context.filesDir)) }
+    fun toggleFavorite(id: String) {
+        favorites = if (id in favorites) favorites - id else favorites + id
+        app.revela.core.FavoritesStore.save(context.filesDir, favorites)
+    }
 
     // Selectivo
     var selParam by remember { mutableStateOf(SelParam.BRIGHTNESS) }
@@ -778,6 +787,15 @@ fun EditorScreen(
                 }) { Icon(Icons.Filled.Check, "Listo", tint = Color.White) }
             }
         }
+        if (activeTool == null && base != null) {
+            FavoritesBar(
+                favorites = favorites,
+                onSelect = {
+                    activeTool = it
+                    bottomTab = BottomTab.NONE
+                }
+            )
+        }
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1181,6 +1199,8 @@ fun EditorScreen(
                 ) {
                     ToolsGrid(
                         modifier = Modifier.fillMaxWidth(),
+                        favorites = favorites.toSet(),
+                        onToggleFavorite = { toggleFavorite(it) },
                         onSelect = {
                             activeTool = it
                             bottomTab = BottomTab.NONE
@@ -2680,35 +2700,68 @@ fun TabButton(
     }
 }
 
+/** Catalogo completo de herramientas (orden de la rejilla) compartido por rejilla y barra de favoritos. */
+fun toolCatalog(): List<Triple<EditorTool, androidx.compose.ui.graphics.vector.ImageVector, String>> = listOf(
+    Triple(EditorTool.TUNE, Icons.Filled.Tune, "Ajustar imagen"),
+    Triple(EditorTool.DETAILS, Icons.Filled.Details, "Detalles"),
+    Triple(EditorTool.CURVES, Icons.Filled.ShowChart, "Curvas"),
+    Triple(EditorTool.WB, Icons.Filled.WbSunny, "Balance blancos"),
+    Triple(EditorTool.TONE, Icons.Filled.Tonality, "Contraste tonal"),
+    Triple(EditorTool.CROP, Icons.Filled.Crop, "Recortar"),
+    Triple(EditorTool.ROTATE, Icons.Filled.RotateRight, "Girar"),
+    Triple(EditorTool.SELECTIVE, Icons.Filled.CenterFocusStrong, "Selectivo"),
+    Triple(EditorTool.HEAL, Icons.Filled.Healing, "Quitamanchas"),
+    Triple(EditorTool.GLOW, Icons.Filled.AutoAwesome, "Brillo glamuroso"),
+    Triple(EditorTool.HDR, Icons.Filled.HdrStrong, "HDR-scape"),
+    Triple(EditorTool.DRAMA, Icons.Filled.Bolt, "Drama"),
+    Triple(EditorTool.VINTAGE, Icons.Filled.PhotoCamera, "Vintage"),
+    Triple(EditorTool.GRAINY_FILM, Icons.Filled.Movie, "Pelicula granulada"),
+    Triple(EditorTool.RETROLUX, Icons.Filled.Flare, "Retrolux"),
+    Triple(EditorTool.GRUNGE, Icons.Filled.Texture, "Grunge"),
+    Triple(EditorTool.BNW, Icons.Filled.FilterBAndW, "B/N"),
+    Triple(EditorTool.NOIR, Icons.Filled.Contrast, "Noir"),
+    Triple(EditorTool.PORTRAIT, Icons.Filled.Face, "Retrato"),
+    Triple(EditorTool.LENS_BLUR, Icons.Filled.BlurOn, "Desenfoque"),
+    Triple(EditorTool.VIGNETTE, Icons.Filled.Vignette, "Vineta"),
+    Triple(EditorTool.DOUBLE_EXPO, Icons.Filled.Layers, "Doble exposicion"),
+    Triple(EditorTool.TEXT, Icons.Filled.TextFields, "Texto"),
+    Triple(EditorTool.FRAME, Icons.Filled.CropFree, "Marcos")
+)
+
+/** Barra de favoritos personalizable: iconos de las herramientas elegidas, siempre bajo la barra superior. */
+@Composable
+fun FavoritesBar(
+    favorites: List<String>,
+    onSelect: (EditorTool) -> Unit
+) {
+    if (favorites.isEmpty()) return
+    val catalog = toolCatalog()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        favorites.forEach { id ->
+            val item = catalog.find { it.first.id == id } ?: return@forEach
+            IconButton(onClick = { onSelect(item.first) }, modifier = Modifier.size(44.dp)) {
+                Icon(item.second, item.third, tint = Color.White)
+            }
+        }
+    }
+}
+
 /** Panel de herramientas (overlay inferior animado; la foto queda visible detras del velo). */
 @Composable
-fun ToolsGrid(modifier: Modifier = Modifier, onSelect: (EditorTool) -> Unit) {
-    val tools = listOf(
-        Triple(EditorTool.TUNE, Icons.Filled.Tune, "Ajustar imagen"),
-        Triple(EditorTool.DETAILS, Icons.Filled.Details, "Detalles"),
-        Triple(EditorTool.CURVES, Icons.Filled.ShowChart, "Curvas"),
-        Triple(EditorTool.WB, Icons.Filled.WbSunny, "Balance blancos"),
-        Triple(EditorTool.TONE, Icons.Filled.Tonality, "Contraste tonal"),
-        Triple(EditorTool.CROP, Icons.Filled.Crop, "Recortar"),
-        Triple(EditorTool.ROTATE, Icons.Filled.RotateRight, "Girar"),
-        Triple(EditorTool.SELECTIVE, Icons.Filled.CenterFocusStrong, "Selectivo"),
-        Triple(EditorTool.HEAL, Icons.Filled.Healing, "Quitamanchas"),
-        Triple(EditorTool.GLOW, Icons.Filled.AutoAwesome, "Brillo glamuroso"),
-        Triple(EditorTool.HDR, Icons.Filled.HdrStrong, "HDR-scape"),
-        Triple(EditorTool.DRAMA, Icons.Filled.Bolt, "Drama"),
-        Triple(EditorTool.VINTAGE, Icons.Filled.PhotoCamera, "Vintage"),
-        Triple(EditorTool.GRAINY_FILM, Icons.Filled.Movie, "Pelicula granulada"),
-        Triple(EditorTool.RETROLUX, Icons.Filled.Flare, "Retrolux"),
-        Triple(EditorTool.GRUNGE, Icons.Filled.Texture, "Grunge"),
-        Triple(EditorTool.BNW, Icons.Filled.FilterBAndW, "B/N"),
-        Triple(EditorTool.NOIR, Icons.Filled.Contrast, "Noir"),
-        Triple(EditorTool.PORTRAIT, Icons.Filled.Face, "Retrato"),
-        Triple(EditorTool.LENS_BLUR, Icons.Filled.BlurOn, "Desenfoque"),
-        Triple(EditorTool.VIGNETTE, Icons.Filled.Vignette, "Vineta"),
-        Triple(EditorTool.DOUBLE_EXPO, Icons.Filled.Layers, "Doble exposicion"),
-        Triple(EditorTool.TEXT, Icons.Filled.TextFields, "Texto"),
-        Triple(EditorTool.FRAME, Icons.Filled.CropFree, "Marcos")
-    )
+fun ToolsGrid(
+    modifier: Modifier = Modifier,
+    favorites: Set<String> = emptySet(),
+    onToggleFavorite: (String) -> Unit = {},
+    onSelect: (EditorTool) -> Unit
+) {
+    val tools = toolCatalog()
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -2733,19 +2786,36 @@ fun ToolsGrid(modifier: Modifier = Modifier, onSelect: (EditorTool) -> Unit) {
                             modifier = Modifier.weight(1f),
                             colors = CardDefaults.cardColors(containerColor = Color(0xFF16161C))
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 20.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(icon, label, tint = Color.White)
-                                Text(
-                                    label,
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.padding(top = 8.dp)
-                                )
+                            Box(Modifier.fillMaxWidth()) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 20.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(icon, label, tint = Color.White)
+                                    Text(
+                                        label,
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.padding(top = 8.dp)
+                                    )
+                                }
+                                val fav = tool.id in favorites
+                                IconButton(
+                                    onClick = { onToggleFavorite(tool.id) },
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(2.dp)
+                                        .size(32.dp)
+                                ) {
+                                    Icon(
+                                        if (fav) Icons.Filled.Star else Icons.Filled.StarBorder,
+                                        contentDescription = if (fav) "Quitar de favoritos" else "Anadir a favoritos",
+                                        tint = if (fav) Color(0xFFFFD54F) else Color(0xFF8A8A8A),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
