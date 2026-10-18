@@ -66,6 +66,7 @@ import androidx.compose.material.icons.filled.FilterBAndW
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.Tonality
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -162,7 +163,8 @@ enum class EditorTool(val id: String, val label: String) {
     HEAL(Tool.HEAL, "Quitamanchas"),
     CROP(Tool.CROP, "Recortar"),
     ROTATE("rotate", "Girar"),
-    BNW(Tool.BNW, "Blanco y negro")
+    BNW(Tool.BNW, "Blanco y negro"),
+    WB(Tool.WHITE_BALANCE, "Balance blancos")
 }
 
 /** Pestañas inferiores estilo Snapseed. */
@@ -571,84 +573,6 @@ fun EditorScreen() {
                 }) { Icon(Icons.Filled.Check, "Listo", tint = Color.White) }
             }
         }
-        // Indicador de valor fino estilo Snapseed (etiqueta + valor + linea con punto)
-        val toolForValue = activeTool
-        if (toolForValue == EditorTool.TUNE || toolForValue == EditorTool.SELECTIVE ||
-            toolForValue == EditorTool.VIGNETTE
-        ) {
-            val range: ClosedFloatingPointRange<Float>
-            val label: String
-            val shown: Float
-            when (toolForValue) {
-                EditorTool.TUNE -> {
-                    label = tuneParam.label
-                    range = EffectiveAdjustments.rangeFor(tuneParam.toolId)
-                    shown = if (dragValue.isNaN()) {
-                        EffectiveAdjustments.valueOf(effective(), tuneParam.toolId, tuneParam.wbParam)
-                    } else dragValue
-                }
-                EditorTool.SELECTIVE -> {
-                    label = selParam.label
-                    range = -1f..1f
-                    val pts = stack.selectivePoints()
-                    val wp = workingPoint
-                    val p = if (wp != null && activePoint in pts.indices) wp
-                    else pts.getOrNull(activePoint)
-                    shown = if (dragValue.isNaN()) {
-                        when (selParam) {
-                            SelParam.BRIGHTNESS -> p?.brightness ?: 0f
-                            SelParam.CONTRAST -> p?.contrast ?: 0f
-                            SelParam.SATURATION -> p?.saturation ?: 0f
-                        }
-                    } else dragValue
-                }
-                else -> {
-                    label = "Viñeta"
-                    range = 0f..1f
-                    shown = if (workingVignette.isNaN()) {
-                        stack.edits.filterIsInstance<Edit.Vignette>().firstOrNull()?.strength ?: 0f
-                    } else workingVignette
-                }
-            }
-            val valueText = when (toolForValue) {
-                EditorTool.TUNE -> EffectiveAdjustments.formatValue(
-                    tuneParam.toolId, tuneParam.wbParam, shown
-                )
-                else -> {
-                    val pct = (shown * 100).toInt()
-                    (if (pct > 0) "+" else "") + "$pct"
-                }
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 40.dp, vertical = 2.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(label, color = Color.Gray, fontSize = 11.sp)
-                    Text(valueText, color = Color.White, fontSize = 12.sp)
-                }
-                val span = range.endInclusive - range.start
-                val frac = if (span > 0) ((shown - range.start) / span).coerceIn(0f, 1f) else 0f
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(12.dp)
-                ) {
-                    val y = size.height / 2
-                    drawLine(
-                        Color(0x33FFFFFF), Offset(0f, y), Offset(size.width, y),
-                        strokeWidth = 3f, cap = StrokeCap.Round
-                    )
-                    drawCircle(Color.White, radius = 5f, center = Offset(size.width * frac, y))
-                }
-            }
-        }
-        // Ventana de imagen (siempre visible) + overlay de herramientas (patron Snapseed:
-        // panel que sube desde abajo ~250 ms con velo, la foto nunca deja de verse)
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1058,415 +982,534 @@ fun EditorScreen() {
                         }
                     )
                 }
-        }
-
-        // Paneles inferiores
-        when (activeTool) {
-            null -> Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF101014))
-                    .navigationBarsPadding()
+            // Indicador fino flotando sobre la foto (nunca la encoje)
+            Box(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
+            // Indicador de valor fino estilo Snapseed (etiqueta + valor + linea con punto)
+            val toolForValue = activeTool
+            if (toolForValue == EditorTool.TUNE || toolForValue == EditorTool.SELECTIVE ||
+                toolForValue == EditorTool.VIGNETTE
             ) {
-                if (bottomTab == BottomTab.LOOKS && base != null) {
-                    LooksCarousel(
-                        thumbs = lookThumbs,
-                        selectedId = stack.edits.filterIsInstance<Edit.Look>().lastOrNull()?.id ?: "none",
-                        onSelect = { look ->
-                            if (look.id == "none") stack.removeTool(Tool.LOOK)
-                            else stack.apply(Edit.Look(look.id))
-                            stackVersion++
-                            persistSession()
-                        },
-                        customStyles = customStyles,
-                        customThumbs = customThumbs,
-                        selectedCustomId = selectedCustomId,
-                        onSelectCustom = { cs ->
-                            runCatching { EditStack.fromJson(cs.editsJson) }.getOrNull()?.let { st ->
-                                stack = st
-                                selectedCustomId = cs.id
-                                stackVersion++
-                                persistSession()
+                val range: ClosedFloatingPointRange<Float>
+                val label: String
+                val shown: Float
+                when (toolForValue) {
+                    EditorTool.TUNE -> {
+                        label = tuneParam.label
+                        range = EffectiveAdjustments.rangeFor(tuneParam.toolId)
+                        shown = if (dragValue.isNaN()) {
+                            EffectiveAdjustments.valueOf(effective(), tuneParam.toolId, tuneParam.wbParam)
+                        } else dragValue
+                    }
+                    EditorTool.SELECTIVE -> {
+                        label = selParam.label
+                        range = -1f..1f
+                        val pts = stack.selectivePoints()
+                        val wp = workingPoint
+                        val p = if (wp != null && activePoint in pts.indices) wp
+                        else pts.getOrNull(activePoint)
+                        shown = if (dragValue.isNaN()) {
+                            when (selParam) {
+                                SelParam.BRIGHTNESS -> p?.brightness ?: 0f
+                                SelParam.CONTRAST -> p?.contrast ?: 0f
+                                SelParam.SATURATION -> p?.saturation ?: 0f
                             }
-                        },
-                        onDeleteCustom = { deleteStyle = it },
-                        onSaveNew = {
-                            styleName = ""
-                            showStyleNameDialog = true
-                        }
+                        } else dragValue
+                    }
+                    else -> {
+                        label = "Viñeta"
+                        range = 0f..1f
+                        shown = if (workingVignette.isNaN()) {
+                            stack.edits.filterIsInstance<Edit.Vignette>().firstOrNull()?.strength ?: 0f
+                        } else workingVignette
+                    }
+                }
+                val valueText = when (toolForValue) {
+                    EditorTool.TUNE -> EffectiveAdjustments.formatValue(
+                        tuneParam.toolId, tuneParam.wbParam, shown
                     )
-                }
-                BottomTabs(
-                    selected = bottomTab,
-                    enabled = base != null,
-                    onSelect = { bottomTab = it },
-                    onExport = { showExportDialog = true }
-                )
-            }
-
-            EditorTool.CURVES -> CurvesPanel(
-                current = EffectiveAdjustments.from(stack).curve
-                    ?: EffectiveAdjustments.defaultCurvePoints(),
-                onChange = { points ->
-                    workingAdj = app.revela.core.ColorMath.Adjustments(curve = points)
-                },
-                onCommit = { points ->
-                    stack.apply(Edit.Curves(points))
-                    stackVersion++
-                    workingAdj = null
-                    persistSession()
-                },
-                onReset = {
-                    stack.removeTool(Tool.CURVES)
-                    stackVersion++
-                    workingAdj = null
-                    persistSession()
-                }
-            )
-
-            EditorTool.SELECTIVE -> Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF101014))
-                    .navigationBarsPadding()
-                    .padding(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    SelParam.entries.forEach { p ->
-                        FilterChip(
-                            selected = selParam == p,
-                            onClick = {
-                                selParam = p
-                                dragValue = Float.NaN
-                            },
-                            label = { Text(p.label, fontSize = 12.sp) },
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        )
+                    else -> {
+                        val pct = (shown * 100).toInt()
+                        (if (pct > 0) "+" else "") + "$pct"
                     }
                 }
-                Text(
-                    "Toca para anadir punto (max 8) - arrastra el punto para moverlo - pulsacion larga para borrar - desliza en horizontal para ajustar",
-                    color = Color.Gray,
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            EditorTool.VIGNETTE -> Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF101014))
-                    .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                val currentV = if (workingVignette.isNaN()) {
-                    stack.edits.filterIsInstance<Edit.Vignette>().firstOrNull()?.strength ?: 0f
-                } else workingVignette
-                Text(
-                    "Intensidad: ${(currentV * 100).toInt()}%",
-                    color = Color.White,
-                    fontSize = 13.sp
-                )
-                Slider(
-                    value = currentV,
-                    onValueChange = { workingVignette = it },
-                    valueRange = 0f..1f
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = {
-                        workingVignette = 0f
-                        stack.removeTool(Tool.VIGNETTE)
-                        stackVersion++
-                        workingVignette = Float.NaN
-                        persistSession()
-                    }) { Text("Quitar") }
-                    Button(onClick = {
-                        val v = if (workingVignette.isNaN()) currentV else workingVignette
-                        stack.apply(Edit.Vignette(v))
-                        stackVersion++
-                        workingVignette = Float.NaN
-                        persistSession()
-                        activeTool = null
-                    }) { Text("Aplicar") }
-                }
-            }
-
-            EditorTool.HEAL -> Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF101014))
-                    .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    "Brocha: ${(brushSize * 100).toInt()}%",
-                    color = Color.White,
-                    fontSize = 13.sp
-                )
-                Slider(
-                    value = brushSize,
-                    onValueChange = { brushSize = it },
-                    valueRange = 0.02f..0.12f
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
-                        onClick = {
-                            if (strokeX.isNotEmpty()) {
-                                stack.applyHealStroke(
-                                    app.revela.core.HealStroke(
-                                        radiusNorm = brushSize,
-                                        xs = strokeX.toList(),
-                                        ys = strokeY.toList()
-                                    )
-                                )
-                                stackVersion++
-                                strokeX.clear()
-                                strokeY.clear()
-                                persistSession()
-                            }
-                        },
-                        enabled = strokeX.isNotEmpty()
-                    ) { Text("Sanar zona") }
-                    OutlinedButton(onClick = {
-                        strokeX.clear()
-                        strokeY.clear()
-                    }) { Text("Descartar trazo") }
-                }
-            }
-
-            EditorTool.CROP -> {
-                val g0 = cropWorking ?: geometry
-                val baseAspect0 = base?.let { it.width.toFloat() / it.height.toFloat() } ?: 1f
-                val odd0 = ((g0.quarterTurns % 4) + 4) % 4 % 2 == 1
-                val frameAspect0 = if (odd0) 1f / baseAspect0 else baseAspect0
-                LaunchedEffect(sourceUri, activeTool) {
-                    if (activeTool == EditorTool.CROP && workingGeometry == null &&
-                        g0.cropLeft <= 0f && g0.cropTop <= 0f &&
-                        g0.cropRight >= 1f && g0.cropBottom >= 1f
-                    ) {
-                        workingGeometry = g0.copy(
-                            cropLeft = 0.1f, cropTop = 0.1f, cropRight = 0.9f, cropBottom = 0.9f
-                        )
-                    }
-                }
-                CropPanel(
-                    geometry = cropWorking ?: geometry,
-                    frameAspect = frameAspect0,
-                    drawMode = cropDrawMode,
-                    onDrawModeChange = { cropDrawMode = it },
-                    onChange = { workingGeometry = it },
-                    onCommit = {
-                        workingGeometry?.let {
-                            geometry = it
-                            persistSession()
-                        }
-                        workingGeometry = null
-                        activeTool = null
-                    },
-                    onCancel = {
-                        workingGeometry = null
-                        activeTool = null
-                    }
-                )
-            }
-
-            EditorTool.TUNE -> Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF101014))
-                    .navigationBarsPadding()
-                    .padding(vertical = 8.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { runAuto() }, modifier = Modifier.size(44.dp)) {
-                        Icon(
-                            Icons.Filled.AutoFixHigh,
-                            contentDescription = "Auto",
-                            tint = Color.White
-                        )
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    HistogramView(
-                        bins = histBins,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(40.dp)
-                    )
-                }
-                AnimatedVisibility(showAutoSnack) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Auto ajustado", color = Color.White, fontSize = 13.sp)
-                        Spacer(Modifier.weight(1f))
-                        TextButton(onClick = { undoAuto() }) { Text("Deshacer") }
-                    }
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    TuneParam.entries.forEach { p ->
-                        FilterChip(
-                            selected = tuneParam == p,
-                            onClick = {
-                                tuneParam = p
-                                dragValue = Float.NaN
-                            },
-                            label = { Text(p.label, fontSize = 12.sp) },
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        )
-                    }
-                }
-                Text(
-                    "Arrastra en vertical para elegir parametro - en horizontal para ajustar",
-                    color = Color.Gray,
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            EditorTool.ROTATE -> Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF101014))
-                    .navigationBarsPadding()
-                    .padding(vertical = 10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    OutlinedButton(onClick = { rotateBy(-1) }) {
-                        Icon(Icons.Filled.RotateLeft, contentDescription = null, tint = Color.White)
-                        Spacer(Modifier.width(6.dp))
-                        Text("90 izq", color = Color.White)
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    OutlinedButton(onClick = { rotateBy(1) }) {
-                        Icon(Icons.Filled.RotateRight, contentDescription = null, tint = Color.White)
-                        Spacer(Modifier.width(6.dp))
-                        Text("90 der", color = Color.White)
-                    }
-                }
-                Text(
-                    "Gira el marco en cuartos de vuelta. El enderece fino esta en Recortar.",
-                    color = Color.Gray,
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 6.dp)
-                )
-            }
-
-            EditorTool.BNW -> {
-                val current = currentBnwFilter()
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF101014))
-                        .navigationBarsPadding()
-                        .padding(vertical = 8.dp)
+                        .padding(horizontal = 40.dp, vertical = 2.dp)
                 ) {
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(label, color = Color.Gray, fontSize = 11.sp)
+                        Text(valueText, color = Color.White, fontSize = 12.sp)
+                    }
+                    val span = range.endInclusive - range.start
+                    val frac = if (span > 0) ((shown - range.start) / span).coerceIn(0f, 1f) else 0f
+                    Canvas(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.Center
+                            .height(12.dp)
                     ) {
-                        listOf(
-                            "neutral" to "Neutro",
-                            "red" to "Rojo",
-                            "yellow" to "Amarillo",
-                            "green" to "Verde",
-                            "blue" to "Azul"
-                        ).forEach { (id, label) ->
-                            FilterChip(
-                                selected = current == id,
-                                onClick = {
-                                    stack.apply(Edit.Bnw(id))
-                                    stackVersion++
-                                    persistSession()
-                                },
-                                label = { Text(label, fontSize = 12.sp) },
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
-                        }
-                        FilterChip(
-                            selected = current == null,
-                            onClick = {
-                                stack.removeTool(Tool.BNW)
-                                stackVersion++
-                                persistSession()
-                            },
-                            label = { Text("Color", fontSize = 12.sp) },
-                            modifier = Modifier.padding(horizontal = 4.dp)
+                        val y = size.height / 2
+                        drawLine(
+                            Color(0x33FFFFFF), Offset(0f, y), Offset(size.width, y),
+                            strokeWidth = 3f, cap = StrokeCap.Round
                         )
+                        drawCircle(Color.White, radius = 5f, center = Offset(size.width * frac, y))
                     }
-                    Text(
-                        "Cada filtro pondera los canales al pasar a blanco y negro.",
-                        color = Color.Gray,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
                 }
             }
+            // Ventana de imagen (siempre visible) + overlay de herramientas (patron Snapseed:
+            }
+            // Carrusel de estilos como overlay inferior (la foto no cambia de tamano)
+            if (bottomTab == BottomTab.LOOKS && activeTool == null && base != null) {
+                Box(Modifier.align(Alignment.BottomCenter)) {
+                                        LooksCarousel(
+                                            thumbs = lookThumbs,
+                                            selectedId = stack.edits.filterIsInstance<Edit.Look>().lastOrNull()?.id ?: "none",
+                                            onSelect = { look ->
+                                                if (look.id == "none") stack.removeTool(Tool.LOOK)
+                                                else stack.apply(Edit.Look(look.id))
+                                                stackVersion++
+                                                persistSession()
+                                            },
+                                            customStyles = customStyles,
+                                            customThumbs = customThumbs,
+                                            selectedCustomId = selectedCustomId,
+                                            onSelectCustom = { cs ->
+                                                runCatching { EditStack.fromJson(cs.editsJson) }.getOrNull()?.let { st ->
+                                                    stack = st
+                                                    selectedCustomId = cs.id
+                                                    stackVersion++
+                                                    persistSession()
+                                                }
+                                            },
+                                            onDeleteCustom = { deleteStyle = it },
+                                            onSaveNew = {
+                                                styleName = ""
+                                                showStyleNameDialog = true
+                                            }
+                                        )
+                }
+            }
+            // Paneles de herramienta como overlay inferior
+            if (activeTool != null) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                ) {
+                    when (activeTool) {
+                                EditorTool.CURVES -> CurvesPanel(
+                                    current = EffectiveAdjustments.from(stack).curve
+                                        ?: EffectiveAdjustments.defaultCurvePoints(),
+                                    onChange = { points ->
+                                        workingAdj = app.revela.core.ColorMath.Adjustments(curve = points)
+                                    },
+                                    onCommit = { points ->
+                                        stack.apply(Edit.Curves(points))
+                                        stackVersion++
+                                        workingAdj = null
+                                        persistSession()
+                                    },
+                                    onReset = {
+                                        stack.removeTool(Tool.CURVES)
+                                        stackVersion++
+                                        workingAdj = null
+                                        persistSession()
+                                    }
+                                )
 
-            EditorTool.TONE -> Column(
+                                EditorTool.SELECTIVE -> Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF101014))
+                                        .padding(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        SelParam.entries.forEach { p ->
+                                            FilterChip(
+                                                selected = selParam == p,
+                                                onClick = {
+                                                    selParam = p
+                                                    dragValue = Float.NaN
+                                                },
+                                                label = { Text(p.label, fontSize = 12.sp) },
+                                                modifier = Modifier.padding(horizontal = 4.dp)
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        "Toca para anadir punto (max 8) - arrastra el punto para moverlo - pulsacion larga para borrar - desliza en horizontal para ajustar",
+                                        color = Color.Gray,
+                                        fontSize = 11.sp,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+
+                                EditorTool.VIGNETTE -> Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF101014))
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    val currentV = if (workingVignette.isNaN()) {
+                                        stack.edits.filterIsInstance<Edit.Vignette>().firstOrNull()?.strength ?: 0f
+                                    } else workingVignette
+                                    Text(
+                                        "Intensidad: ${(currentV * 100).toInt()}%",
+                                        color = Color.White,
+                                        fontSize = 13.sp
+                                    )
+                                    Slider(
+                                        value = currentV,
+                                        onValueChange = { workingVignette = it },
+                                        valueRange = 0f..1f
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        OutlinedButton(onClick = {
+                                            workingVignette = 0f
+                                            stack.removeTool(Tool.VIGNETTE)
+                                            stackVersion++
+                                            workingVignette = Float.NaN
+                                            persistSession()
+                                        }) { Text("Quitar") }
+                                        Button(onClick = {
+                                            val v = if (workingVignette.isNaN()) currentV else workingVignette
+                                            stack.apply(Edit.Vignette(v))
+                                            stackVersion++
+                                            workingVignette = Float.NaN
+                                            persistSession()
+                                            activeTool = null
+                                        }) { Text("Aplicar") }
+                                    }
+                                }
+
+                                EditorTool.HEAL -> Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF101014))
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        "Brocha: ${(brushSize * 100).toInt()}%",
+                                        color = Color.White,
+                                        fontSize = 13.sp
+                                    )
+                                    Slider(
+                                        value = brushSize,
+                                        onValueChange = { brushSize = it },
+                                        valueRange = 0.02f..0.12f
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        Button(
+                                            onClick = {
+                                                if (strokeX.isNotEmpty()) {
+                                                    stack.applyHealStroke(
+                                                        app.revela.core.HealStroke(
+                                                            radiusNorm = brushSize,
+                                                            xs = strokeX.toList(),
+                                                            ys = strokeY.toList()
+                                                        )
+                                                    )
+                                                    stackVersion++
+                                                    strokeX.clear()
+                                                    strokeY.clear()
+                                                    persistSession()
+                                                }
+                                            },
+                                            enabled = strokeX.isNotEmpty()
+                                        ) { Text("Sanar zona") }
+                                        OutlinedButton(onClick = {
+                                            strokeX.clear()
+                                            strokeY.clear()
+                                        }) { Text("Descartar trazo") }
+                                    }
+                                }
+
+                                EditorTool.CROP -> {
+                                    val g0 = cropWorking ?: geometry
+                                    val baseAspect0 = base?.let { it.width.toFloat() / it.height.toFloat() } ?: 1f
+                                    val odd0 = ((g0.quarterTurns % 4) + 4) % 4 % 2 == 1
+                                    val frameAspect0 = if (odd0) 1f / baseAspect0 else baseAspect0
+                                    LaunchedEffect(sourceUri, activeTool) {
+                                        if (activeTool == EditorTool.CROP && workingGeometry == null &&
+                                            g0.cropLeft <= 0f && g0.cropTop <= 0f &&
+                                            g0.cropRight >= 1f && g0.cropBottom >= 1f
+                                        ) {
+                                            workingGeometry = g0.copy(
+                                                cropLeft = 0.1f, cropTop = 0.1f, cropRight = 0.9f, cropBottom = 0.9f
+                                            )
+                                        }
+                                    }
+                                    CropPanel(
+                                        geometry = cropWorking ?: geometry,
+                                        frameAspect = frameAspect0,
+                                        drawMode = cropDrawMode,
+                                        onDrawModeChange = { cropDrawMode = it },
+                                        onChange = { workingGeometry = it },
+                                        onCommit = {
+                                            workingGeometry?.let {
+                                                geometry = it
+                                                persistSession()
+                                            }
+                                            workingGeometry = null
+                                            activeTool = null
+                                        },
+                                        onCancel = {
+                                            workingGeometry = null
+                                            activeTool = null
+                                        }
+                                    )
+                                }
+
+                                EditorTool.TUNE -> Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF101014))
+                                        .padding(vertical = 8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        IconButton(onClick = { runAuto() }, modifier = Modifier.size(44.dp)) {
+                                            Icon(
+                                                Icons.Filled.AutoFixHigh,
+                                                contentDescription = "Auto",
+                                                tint = Color.White
+                                            )
+                                        }
+                                        Spacer(Modifier.width(10.dp))
+                                        HistogramView(
+                                            bins = histBins,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(40.dp)
+                                        )
+                                    }
+                                    AnimatedVisibility(showAutoSnack) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 12.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("Auto ajustado", color = Color.White, fontSize = 13.sp)
+                                            Spacer(Modifier.weight(1f))
+                                            TextButton(onClick = { undoAuto() }) { Text("Deshacer") }
+                                        }
+                                    }
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        TuneParam.entries.forEach { p ->
+                                            FilterChip(
+                                                selected = tuneParam == p,
+                                                onClick = {
+                                                    tuneParam = p
+                                                    dragValue = Float.NaN
+                                                },
+                                                label = { Text(p.label, fontSize = 12.sp) },
+                                                modifier = Modifier.padding(horizontal = 4.dp)
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        "Arrastra en vertical para elegir parametro - en horizontal para ajustar",
+                                        color = Color.Gray,
+                                        fontSize = 11.sp,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+
+                                EditorTool.ROTATE -> Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF101014))
+                                        .padding(vertical = 10.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        OutlinedButton(onClick = { rotateBy(-1) }) {
+                                            Icon(Icons.Filled.RotateLeft, contentDescription = null, tint = Color.White)
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("90 izq", color = Color.White)
+                                        }
+                                        Spacer(Modifier.width(16.dp))
+                                        OutlinedButton(onClick = { rotateBy(1) }) {
+                                            Icon(Icons.Filled.RotateRight, contentDescription = null, tint = Color.White)
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("90 der", color = Color.White)
+                                        }
+                                    }
+                                    Text(
+                                        "Gira el marco en cuartos de vuelta. El enderece fino esta en Recortar.",
+                                        color = Color.Gray,
+                                        fontSize = 11.sp,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 6.dp)
+                                    )
+                                }
+
+                                EditorTool.BNW -> {
+                                    val current = currentBnwFilter()
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFF101014))
+                                            .padding(vertical = 8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState()),
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            listOf(
+                                                "neutral" to "Neutro",
+                                                "red" to "Rojo",
+                                                "yellow" to "Amarillo",
+                                                "green" to "Verde",
+                                                "blue" to "Azul"
+                                            ).forEach { (id, label) ->
+                                                FilterChip(
+                                                    selected = current == id,
+                                                    onClick = {
+                                                        stack.apply(Edit.Bnw(id))
+                                                        stackVersion++
+                                                        persistSession()
+                                                    },
+                                                    label = { Text(label, fontSize = 12.sp) },
+                                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                                )
+                                            }
+                                            FilterChip(
+                                                selected = current == null,
+                                                onClick = {
+                                                    stack.removeTool(Tool.BNW)
+                                                    stackVersion++
+                                                    persistSession()
+                                                },
+                                                label = { Text("Color", fontSize = 12.sp) },
+                                                modifier = Modifier.padding(horizontal = 4.dp)
+                                            )
+                                        }
+                                        Text(
+                                            "Cada filtro pondera los canales al pasar a blanco y negro.",
+                                            color = Color.Gray,
+                                            fontSize = 11.sp,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                }
+
+                                EditorTool.TONE -> Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF101014))
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    TonalSlider("Sombras", effective().tonalShadows) { v ->
+                                        workingAdj = effective().copy(tonalShadows = v)
+                                    }
+                                    TonalSlider("Medios", effective().tonalMidtones) { v ->
+                                        workingAdj = effective().copy(tonalMidtones = v)
+                                    }
+                                    TonalSlider("Luces", effective().tonalHighlights) { v ->
+                                        workingAdj = effective().copy(tonalHighlights = v)
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        TextButton(onClick = {
+                                            stack.removeTool(Tool.TONAL)
+                                            stackVersion++
+                                            workingAdj = null
+                                            persistSession()
+                                        }) { Text("Restablecer", color = Color.Gray) }
+                                        Spacer(Modifier.width(16.dp))
+                                        Button(onClick = {
+                                            commitTonal()
+                                            activeTool = null
+                                        }) { Text("Aplicar") }
+                                    }
+                                }
+
+                                EditorTool.WB -> Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF101014))
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    TonalSlider("Temperatura", effective().temperature) { v ->
+                                        workingAdj = effective().copy(temperature = v)
+                                    }
+                                    TonalSlider("Tinte", effective().tint) { v ->
+                                        workingAdj = effective().copy(tint = v)
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        TextButton(onClick = {
+                                            stack.removeTool(Tool.WHITE_BALANCE)
+                                            stackVersion++
+                                            workingAdj = null
+                                            persistSession()
+                                        }) { Text("Restablecer", color = Color.Gray) }
+                                        Spacer(Modifier.width(16.dp))
+                                        Button(onClick = {
+                                            val cur = effective()
+                                            stack.apply(
+                                                Edit.WhiteBalance(temperature = cur.temperature, tint = cur.tint)
+                                            )
+                                            stackVersion++
+                                            workingAdj = null
+                                            persistSession()
+                                        }) { Text("Aplicar") }
+                                    }
+                                }
+
+                                else -> {}
+
+                            }
+                }
+            }
+        }
+        // Barra de pestañas fija (la foto nunca cambia de altura al abrir paneles)
+        if (activeTool == null) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFF101014))
                     .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                TonalSlider("Sombras", effective().tonalShadows) { v ->
-                    workingAdj = effective().copy(tonalShadows = v)
-                }
-                TonalSlider("Medios", effective().tonalMidtones) { v ->
-                    workingAdj = effective().copy(tonalMidtones = v)
-                }
-                TonalSlider("Luces", effective().tonalHighlights) { v ->
-                    workingAdj = effective().copy(tonalHighlights = v)
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    TextButton(onClick = {
-                        stack.removeTool(Tool.TONAL)
-                        stackVersion++
-                        workingAdj = null
-                        persistSession()
-                    }) { Text("Restablecer", color = Color.Gray) }
-                    Spacer(Modifier.width(16.dp))
-                    Button(onClick = {
-                        commitTonal()
-                        activeTool = null
-                    }) { Text("Aplicar") }
-                }
+                                BottomTabs(
+                                    selected = bottomTab,
+                                    enabled = base != null,
+                                    onSelect = { bottomTab = it },
+                                    onExport = { showExportDialog = true }
+                                )
             }
-
-            else -> {}
-
         }
-
         if (showWelcome) {
             WelcomeWizard(
                 onFinish = {
@@ -2181,7 +2224,8 @@ fun ToolsGrid(modifier: Modifier = Modifier, onSelect: (EditorTool) -> Unit) {
         Triple(EditorTool.VIGNETTE, Icons.Filled.Vignette, "Viñeta"),
         Triple(EditorTool.CROP, Icons.Filled.Crop, "Recortar"),
         Triple(EditorTool.ROTATE, Icons.Filled.RotateRight, "Girar"),
-        Triple(EditorTool.BNW, Icons.Filled.FilterBAndW, "Blanco y negro")
+        Triple(EditorTool.BNW, Icons.Filled.FilterBAndW, "Blanco y negro"),
+        Triple(EditorTool.WB, Icons.Filled.WbSunny, "Balance blancos")
     )
     Column(
         modifier = modifier
