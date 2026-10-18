@@ -26,7 +26,7 @@ updated: "2026-10-18"
 - [ ] FASE 10 restante: Perspectiva (warp 4 esquinas), Expandir (outpaint), Pincel (mascaras por pincelada), Head Pose (deteccion de cara), Selectivo v2 (mascara visible) <!-- added: 2026-10-18 -->
 - [ ] FASE 12: Stack avanzado: View edits por capas (ocultar/modificar/eliminar por herramienta), Undo/Redo/Revert en sheet, export con Settings (sizing long-edge, formato JPG/PNG, calidad) + Share intent Android <!-- added: 2026-10-18 -->
 - [ ] FASE 13: Settings de revela (tema, export) + "Tutoriales" propios (tips por herramienta, patron Snapseed) + reordenar/renombrar estilos personalizados <!-- added: 2026-10-18 -->
-- [ ] Pendiente de fase 3: decision de publicacion (repo publico AGPL + landing) <!-- added: 2026-10-12 -->
+- [x] Publicacion HECHA: github.com/gnacho/revela, publico, AGPL-3.0 (LICENSE + README actualizado con capturas nuevas); landing pendiente <!-- done: 2026-10-18 -->
 - [ ] Pulir radios de agarre del crop (26dp -> ~18dp) y layout del slider Enderezar en pantallas estrechas <!-- added: 2026-10-12 -->
 - [ ] Calidad del inpaint en zonas grandes (valorar OpenCV si no basta la difusion) <!-- added: 2026-10-12 -->
 - [ ] Validar en el OnePlus fisico: gestos tactiles de las 9 tools + wizard + estilos (cable flaky) <!-- added: 2026-10-12 -->
