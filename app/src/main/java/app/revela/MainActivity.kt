@@ -3478,6 +3478,22 @@ fun LooksCarousel(
     ) {
         Look.entries.forEach { look ->
             val sel = look.id == selectedId
+            // look_thumbnail_state (patron Snapseed): transicion animada del estado seleccionado
+            val scale by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (sel) 1.14f else 1f,
+                animationSpec = androidx.compose.animation.core.tween(180, easing = FastOutSlowInEasing),
+                label = "lookScale"
+            )
+            val borderW by androidx.compose.animation.core.animateDpAsState(
+                targetValue = if (sel) 3.dp else 1.dp,
+                animationSpec = androidx.compose.animation.core.tween(180, easing = FastOutSlowInEasing),
+                label = "lookBorderW"
+            )
+            val borderA by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (sel) 1f else 0.35f,
+                animationSpec = androidx.compose.animation.core.tween(180, easing = FastOutSlowInEasing),
+                label = "lookBorderA"
+            )
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -3493,10 +3509,14 @@ fun LooksCarousel(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(64.dp)
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                            }
                             .clip(RoundedCornerShape(8.dp))
                             .border(
-                                width = if (sel) 2.dp else 1.dp,
-                                color = if (sel) Color.White else Color(0xFF333340),
+                                width = borderW,
+                                color = Color.White.copy(alpha = borderA),
                                 shape = RoundedCornerShape(8.dp)
                             )
                     )
@@ -3517,6 +3537,21 @@ fun LooksCarousel(
         }
         customStyles.forEach { cs ->
             val sel = cs.id == selectedCustomId
+            val scale by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (sel) 1.14f else 1f,
+                animationSpec = androidx.compose.animation.core.tween(180, easing = FastOutSlowInEasing),
+                label = "csScale"
+            )
+            val borderW by androidx.compose.animation.core.animateDpAsState(
+                targetValue = if (sel) 3.dp else 1.dp,
+                animationSpec = androidx.compose.animation.core.tween(180, easing = FastOutSlowInEasing),
+                label = "csBorderW"
+            )
+            val borderA by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (sel) 1f else 0.35f,
+                animationSpec = androidx.compose.animation.core.tween(180, easing = FastOutSlowInEasing),
+                label = "csBorderA"
+            )
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -3533,10 +3568,14 @@ fun LooksCarousel(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .size(64.dp)
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
                                 .clip(RoundedCornerShape(8.dp))
                                 .border(
-                                    width = if (sel) 2.dp else 1.dp,
-                                    color = if (sel) Color(0xFFB388FF) else Color(0xFF333340),
+                                    width = borderW,
+                                    color = Color(0xFFB388FF).copy(alpha = borderA),
                                     shape = RoundedCornerShape(8.dp)
                                 )
                         )

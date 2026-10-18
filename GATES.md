@@ -99,7 +99,7 @@ Scope: FASE 11 completa en 5 paquetes ordenados: HOME (biblioteca de sesiones pe
   EXPECT: DBL_OK
   EVIDENCE: automatic-evidence=v1; definition-sha256=7ec12389f05121c88618bbb247b6afffd042b1d9120a38fb630f32e38599e130; exit=0; EXPECT=matched; output-sha256=a8f606436ac578097a53867e60a71d0f050f3c0f74e79b551fe63dd379f49e93; output-bytes=6; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git
 
-- [ ] G18: Animacion look_thumbnail_state replicada en el carrusel de Estilos (frames intermedios, no aparicion en seco)
-  CHECK: (screenrecord del carrusel al cambiar de estilo; frames intermedios con alpha/scale entre thumbs)
+- [x] G18: Animacion look_thumbnail_state replicada en el carrusel de Estilos (frames intermedios, no aparicion en seco)
+  CHECK: ./gradlew assembleRelease -q > /dev/null 2>&1 && python3 ~/temp/opencode-work/revela-gates/g18.py 2>&1 | tail -1
   EXPECT: LOOKANIM_OK
-  EVIDENCE: (pendiente)
+  EVIDENCE: automatic-evidence=v1; definition-sha256=92aa4f66955fba7d5ef3514994749f45067151672038ae64b550b350459b7b9a; exit=0; EXPECT=matched; output-sha256=35e6e012a39d9dccb1284a2997d7fa17a98a98e483e351631eb8302fa64728a1; output-bytes=11; shell=/bin/sh; cwd=/home/nacho/Documentos/Repos/revela-git
