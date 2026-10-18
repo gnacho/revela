@@ -23,7 +23,7 @@ updated: "2026-10-18"
 - [x] Analisis REA de Snapseed completo (28 tools, medidas, gestos, flujos) <!-- done: 2026-10-18 -->
 - [x] BUG iconos OnePlus: RESUELTO - la build nueva los renderiza bien en el dispositivo (captura 18-Oct); era la build vieja <!-- done: 2026-10-18 -->
 - [x] FASE 9 parcial HECHA (ver abajo fase 10): Detalles, HDR-scape, Balance de blancos; quedan Perspectiva, Expandir, Ambiance <!-- edited: 2026-10-18 -->
-- [ ] FASE 10 restante: Perspectiva (warp 4 esquinas), Expandir (outpaint), Pincel (mascaras por pincelada), Head Pose (deteccion de cara), Selectivo v2 (mascara visible) <!-- added: 2026-10-18 -->
+- [ ] FASE 11 (desbloqueada por analisis REA del APK real, ver plans/revela/rea-snapseed-resources.md): HOME con biblioteca de fotos abiertas (grid de sesiones, tap reabre), barra de favoritos personalizable siempre visible, cerrar 28/28 (Perspective con 8 puntos y modos free/scale/tilt/rotate, Expand, Brush multi-param, Head Pose), Doble exposicion completa (+blend add/overlay, opacity, rotar/escalar 2a capa), replicar animator look_thumbnail_state en el carrusel <!-- added: 2026-10-18 -->
 - [ ] FASE 12: Stack avanzado: View edits por capas (ocultar/modificar/eliminar por herramienta), Undo/Redo/Revert en sheet, export con Settings (sizing long-edge, formato JPG/PNG, calidad) + Share intent Android <!-- added: 2026-10-18 -->
 - [ ] FASE 13: Settings de revela (tema, export) + "Tutoriales" propios (tips por herramienta, patron Snapseed) + reordenar/renombrar estilos personalizados <!-- added: 2026-10-18 -->
 - [x] Publicacion HECHA: github.com/gnacho/revela, publico, AGPL-3.0 (LICENSE + README actualizado con capturas nuevas); landing pendiente <!-- done: 2026-10-18 -->
