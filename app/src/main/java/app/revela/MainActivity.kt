@@ -47,6 +47,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -1287,8 +1288,11 @@ fun EditorScreen(
         // abierto se reencuadra suavemente en la zona de encima del panel (patron Snapseed,
         // issue #2). El panel sube por debajo con un velo.
         val panelOpen = activeTool == null && bottomTab != BottomTab.NONE && base != null
+        // Solo HERRAMIENTAS (rejilla grande) reencuadra la foto; ESTILOS es una franja
+        // del carrusel que no necesita empeñecer la foto (feedback del usuario).
+        val toolsPanelOpen = activeTool == null && bottomTab == BottomTab.TOOLS && base != null
         val photoFrac by animateFloatAsState(
-            targetValue = if (panelOpen) 0.3f else 1f,
+            targetValue = if (toolsPanelOpen) 0.3f else 1f,
             animationSpec = tween(280, easing = FastOutSlowInEasing),
             label = "photoFrac"
         )
@@ -2912,9 +2916,9 @@ fun EditorScreen(
                 }
             }
         }
-        // Velo sobre la foto mientras un panel esta abierto; tocarlo cierra el panel
+        // Velo sobre la foto solo con el panel de HERRAMIENTAS abierto; tocarlo cierra
         androidx.compose.animation.AnimatedVisibility(
-            visible = panelOpen,
+            visible = toolsPanelOpen,
             enter = fadeIn(tween(160)),
             exit = fadeOut(tween(120))
         ) {
@@ -2975,11 +2979,11 @@ fun EditorScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.7f)
+                    .wrapContentHeight()
                     .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(Ui.sheet)
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.fillMaxWidth().wrapContentHeight()) {
                     LooksCarousel(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
