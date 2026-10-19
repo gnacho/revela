@@ -86,6 +86,7 @@ import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Texture
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -165,6 +166,7 @@ import app.revela.render.SessionIndexStore
 import app.revela.render.SessionStore
 import app.revela.core.AutoLevels
 import app.revela.core.CustomStyle
+import app.revela.core.CustomStylesCodec
 import app.revela.core.WbParam
 import app.revela.core.WelcomeStore
 import app.revela.core.Presets
@@ -192,6 +194,7 @@ import androidx.compose.material.icons.filled.FaceRetouchingNatural
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.AspectRatio
+import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BlurOn
 import androidx.compose.material.icons.outlined.Bolt
@@ -456,8 +459,11 @@ class MainActivity : ComponentActivity() {
             )
         )
         setContent {
-            MaterialTheme(
-                colorScheme = androidx.compose.material3.lightColorScheme(
+            // El tema se aplica ANTES de componer: la paleta Ui es global y reactiva al recomponer
+            val initialTheme = remember { app.revela.core.SettingsStore.load(filesDir).theme }
+            Ui.setDark(initialTheme == "dark")
+            val scheme = if (Ui.dark) {
+                androidx.compose.material3.darkColorScheme(
                     primary = Ui.accent,
                     onPrimary = androidx.compose.ui.graphics.Color.White,
                     secondary = Ui.accent,
@@ -468,6 +474,21 @@ class MainActivity : ComponentActivity() {
                     background = Ui.bg,
                     onBackground = Ui.text
                 )
+            } else {
+                androidx.compose.material3.lightColorScheme(
+                    primary = Ui.accent,
+                    onPrimary = androidx.compose.ui.graphics.Color.White,
+                    secondary = Ui.accent,
+                    surface = Ui.card,
+                    onSurface = Ui.text,
+                    surfaceVariant = Ui.panel,
+                    onSurfaceVariant = Ui.textDim,
+                    background = Ui.bg,
+                    onBackground = Ui.text
+                )
+            }
+            MaterialTheme(
+                colorScheme = scheme
             ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val context = LocalContext.current
@@ -609,6 +630,7 @@ fun EditorScreen(
     }
     var showRevertConfirm by remember { mutableStateOf(false) }
     var showLayers by remember { mutableStateOf(false) }
+    var showTip by remember { mutableStateOf<String?>(null) }
     var hiddenLayers by remember { mutableStateOf<Set<String>>(emptySet()) }
     var lookThumbs by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
 
@@ -620,6 +642,8 @@ fun EditorScreen(
     var showStyleNameDialog by remember { mutableStateOf(false) }
     var styleName by remember { mutableStateOf("") }
     var deleteStyle by remember { mutableStateOf<CustomStyle?>(null) }
+    var manageStyle by remember { mutableStateOf<CustomStyle?>(null) }
+    var manageName by remember { mutableStateOf("") }
     var selectedCustomId by remember { mutableStateOf<String?>(null) }
 
     // Barra de favoritos (ids de herramienta, persistidos)
@@ -1178,6 +1202,15 @@ fun EditorScreen(
                     }
                 }
             } else {
+                // Consejo de la herramienta activa (patron Snapseed: la ayuda vive en la barra)
+                // Idioma efectivo (no el ajuste "system"): el consejo debe seguir al que se ve en pantalla
+                val tipLang = context.resources.configuration.locales[0].language
+                val activeTip = activeTool?.let { Tutorials.tipFor(it.id, tipLang) }
+                if (activeTip != null) {
+                    IconButton(onClick = { showTip = activeTip }) {
+                        Icon(Icons.Outlined.HelpOutline, stringResource(R.string.tool_tip), tint = Ui.icon)
+                    }
+                }
                 IconButton(onClick = {
                     activeTool = null
                     workingAdj = null
@@ -2905,6 +2938,10 @@ fun EditorScreen(
                     }
                 },
                 onDeleteCustom = { deleteStyle = it },
+                onManageCustom = {
+                    manageStyle = it
+                    manageName = it.name
+                },
                 onSaveNew = {
                     styleName = ""
                     showStyleNameDialog = true
@@ -3050,6 +3087,7 @@ fun EditorScreen(
         var cfgPng by remember { mutableStateOf(appSettings.exportPng) }
         var cfgQuality by remember { mutableIntStateOf(appSettings.exportQuality) }
         var cfgLang by remember { mutableStateOf(appSettings.language) }
+        var cfgTheme by remember { mutableStateOf(appSettings.theme) }
         AlertDialog(
             onDismissRequest = { showSettings = false },
             title = { Text(stringResource(R.string.settings)) },
@@ -3074,6 +3112,20 @@ fun EditorScreen(
                         color = Ui.textDim
                     )
                     Spacer(Modifier.height(12.dp))
+                    Text(stringResource(R.string.theme), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = cfgTheme != "dark",
+                            onClick = { cfgTheme = "light" },
+                            label = { Text(stringResource(R.string.theme_light)) }
+                        )
+                        FilterChip(
+                            selected = cfgTheme == "dark",
+                            onClick = { cfgTheme = "dark" },
+                            label = { Text(stringResource(R.string.theme_dark)) }
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
                     Text(stringResource(R.string.language), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
@@ -3097,10 +3149,15 @@ fun EditorScreen(
             confirmButton = {
                 Button(onClick = {
                     val langChanged = cfgLang != appSettings.language
-                    appSettings = appSettings.copy(exportPng = cfgPng, exportQuality = cfgQuality, language = cfgLang)
+                    val themeChanged = cfgTheme != appSettings.theme
+                    appSettings = appSettings.copy(
+                        exportPng = cfgPng, exportQuality = cfgQuality,
+                        language = cfgLang, theme = cfgTheme
+                    )
                     app.revela.core.SettingsStore.save(context.filesDir, appSettings)
+                    Ui.setDark(cfgTheme == "dark")
                     showSettings = false
-                    if (langChanged) (context as? android.app.Activity)?.recreate()
+                    if (langChanged || themeChanged) (context as? android.app.Activity)?.recreate()
                 }) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
@@ -3204,6 +3261,17 @@ fun EditorScreen(
                 OutlinedButton(onClick = { showNote = false }) {
                     Text(stringResource(R.string.cancel))
                 }
+            }
+        )
+    }
+
+    showTip?.let { tip ->
+        AlertDialog(
+            onDismissRequest = { showTip = null },
+            title = { Text(stringResource(R.string.tool_tip)) },
+            text = { Text(tip) },
+            confirmButton = {
+                TextButton(onClick = { showTip = null }) { Text(stringResource(R.string.done)) }
             }
         )
     }
@@ -3313,6 +3381,60 @@ fun EditorScreen(
             },
             dismissButton = {
                 OutlinedButton(onClick = { deleteStyle = null }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
+    manageStyle?.let { cs ->
+        val idx = customStyles.indexOfFirst { it.id == cs.id }
+        AlertDialog(
+            onDismissRequest = { manageStyle = null },
+            title = { Text(stringResource(R.string.manage_style)) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = manageName,
+                        onValueChange = { manageName = it },
+                        label = { Text(stringResource(R.string.style_name)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                customStyles = CustomStylesCodec.move(customStyles, cs.id, -1)
+                                app.revela.render.CustomStylesStore.save(context, customStyles)
+                                manageStyle = customStyles.firstOrNull { it.id == cs.id }
+                            },
+                            enabled = idx > 0
+                        ) { Text(stringResource(R.string.move_left)) }
+                        OutlinedButton(
+                            onClick = {
+                                customStyles = CustomStylesCodec.move(customStyles, cs.id, 1)
+                                app.revela.render.CustomStylesStore.save(context, customStyles)
+                                manageStyle = customStyles.firstOrNull { it.id == cs.id }
+                            },
+                            enabled = idx in 0 until customStyles.lastIndex
+                        ) { Text(stringResource(R.string.move_right)) }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (!CustomStylesCodec.nameTaken(customStyles, manageName, cs.id)) {
+                            customStyles = CustomStylesCodec.rename(customStyles, cs.id, manageName)
+                            app.revela.render.CustomStylesStore.save(context, customStyles)
+                        }
+                        manageStyle = null
+                    },
+                    enabled = manageName.isNotBlank() &&
+                        !CustomStylesCodec.nameTaken(customStyles, manageName, cs.id)
+                ) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { manageStyle = null }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -4052,6 +4174,7 @@ fun LooksCarousel(
     selectedCustomId: String? = null,
     onSelectCustom: (CustomStyle) -> Unit = {},
     onDeleteCustom: (CustomStyle) -> Unit = {},
+    onManageCustom: (CustomStyle) -> Unit = {},
     onSaveNew: () -> Unit = {}
 ) {
     Row(
@@ -4142,7 +4265,10 @@ fun LooksCarousel(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .clickable { onSelectCustom(cs) }
+                    .combinedClickable(
+                        onClick = { onSelectCustom(cs) },
+                        onLongClick = { onManageCustom(cs) }
+                    )
                     .padding(4.dp)
             ) {
                 Box {

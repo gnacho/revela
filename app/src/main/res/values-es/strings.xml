@@ -204,6 +204,14 @@
     <string name="default_export">Exportar por defecto</string>
     <string name="quality">Calidad: %1$d</string>
     <string name="export_saved_hint">La imagen exportada se guarda en Imágenes/revela.</string>
+    <string name="tool_tip">Consejos</string>
+    <string name="manage_style">Gestionar estilo</string>
+    <string name="style_name">Nombre del estilo</string>
+    <string name="move_left">Mover izquierda</string>
+    <string name="move_right">Mover derecha</string>
+    <string name="theme">Tema</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Oscuro</string>
     <string name="language">Idioma</string>
     <string name="system">Sistema</string>
     <string name="spanish">Español</string>

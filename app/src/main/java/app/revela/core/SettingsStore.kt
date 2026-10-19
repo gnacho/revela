@@ -11,7 +11,8 @@ data class AppSettings(
     val exportQuality: Int = 92,
     val sortMode: String = "recent",   // recent | oldest | name_az | name_za
     val viewMode: String = "grid",     // grid | list
-    val language: String = "system"    // system | es | en
+    val language: String = "system",   // system | es | en
+    val theme: String = "light"        // light | dark
 )
 
 object SettingsStore {

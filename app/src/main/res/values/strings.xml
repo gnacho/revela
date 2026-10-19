@@ -204,6 +204,14 @@
     <string name="default_export">Default export</string>
     <string name="quality">Quality: %1$d</string>
     <string name="export_saved_hint">The exported image is saved to Pictures/revela.</string>
+    <string name="tool_tip">Tips</string>
+    <string name="manage_style">Manage style</string>
+    <string name="style_name">Style name</string>
+    <string name="move_left">Move left</string>
+    <string name="move_right">Move right</string>
+    <string name="theme">Theme</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
     <string name="language">Language</string>
     <string name="system">System</string>
     <string name="spanish">Spanish</string>
