@@ -3658,12 +3658,12 @@ fun FavoritesBar(
     ) {
         favorites.forEach { id ->
             val item = catalog.find { it.first.id == id } ?: return@forEach
-            IconButton(onClick = { onSelect(item.first) }, modifier = Modifier.size(52.dp)) {
-                Icon(item.second, item.third, tint = Ui.icon, modifier = Modifier.size(32.dp))
+            IconButton(onClick = { onSelect(item.first) }, modifier = Modifier.size(62.dp)) {
+                Icon(item.second, item.third, tint = Ui.icon, modifier = Modifier.size(50.dp))
             }
         }
-        IconButton(onClick = onEdit, modifier = Modifier.size(52.dp)) {
-            Icon(Icons.Outlined.Edit, "Personalizar barra de herramientas", tint = Ui.textDim, modifier = Modifier.size(30.dp))
+        IconButton(onClick = onEdit, modifier = Modifier.size(62.dp)) {
+            Icon(Icons.Outlined.Edit, "Personalizar barra de herramientas", tint = Ui.textDim, modifier = Modifier.size(44.dp))
         }
     }
 }
