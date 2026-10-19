@@ -19,6 +19,8 @@ updated: "2026-10-18"
 
 ### Pending
 
+- [ ] Issue #1 ( OnePlus): VERIFICAR en el movil el fix del selector (`c98331d`, GetContent). En el emulador OK (G26-G29 en verde); el OnePlus exigia "Hecho" en el Photo Picker y los botones "Ocultar capa" no respondian a los taps de adb (la papelera si). Pendiente repetir el flujo con el dedo cuando se reconecte <!-- added: 2026-10-19 -->
+
 - [ ] Capturas del README desactualizadas (muestran la UI previa al rediseño Snapseed; rehacer con la rejilla 3x3 + wizard) <!-- added: 2026-10-18 -->
 - [x] Analisis REA de Snapseed completo (28 tools, medidas, gestos, flujos) <!-- done: 2026-10-18 -->
 - [x] BUG iconos OnePlus: RESUELTO - la build nueva los renderiza bien en el dispositivo (captura 18-Oct); era la build vieja <!-- done: 2026-10-18 -->
