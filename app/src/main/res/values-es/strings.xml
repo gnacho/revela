@@ -271,4 +271,6 @@
     <string name="delete_original_done">Foto original eliminada</string>
     <string name="delete_original_error">No se pudo eliminar la foto original</string>
     <string name="delete_original_repick">Esta foto se abrió con el selector antiguo y no se puede borrar. Ábrela con Abrir foto para poder eliminarla.</string>
+    <string name="note_saved">Nota guardada</string>
+    <string name="note_error">No se pudo guardar la nota</string>
 </resources>

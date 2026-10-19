@@ -697,7 +697,8 @@ fun EditorScreen(
 
     fun persistSession() {
         val u = sourceUri ?: return
-        SessionStore.save(context, u, stack, geometry)
+        // Un fallo guardando la sesion no debe impedir el indice (ni la nota)
+        runCatching { SessionStore.save(context, u, stack, geometry) }
         SessionIndexStore.upsert(context.filesDir, u.toString(), stack, geometry)
         thumbJob?.cancel()
         thumbJob = scope.launch {
@@ -3098,13 +3099,21 @@ fun EditorScreen(
             },
             confirmButton = {
                 Button(onClick = {
-                    sourceUri?.let { u ->
+                    val u = sourceUri
+                    val ok = if (u == null) false else {
+                        // La sesion puede no existir aun si la foto no tiene ediciones: crearla antes de la nota
+                        persistSession()
                         SessionIndexStore.setNote(
                             context.filesDir,
                             SessionIndexStore.idFor(u.toString()),
                             noteText.trim()
                         )
                     }
+                    Toast.makeText(
+                        context,
+                        if (ok) R.string.note_saved else R.string.note_error,
+                        Toast.LENGTH_SHORT
+                    ).show()
                     showNote = false
                 }) { Text(stringResource(R.string.note_save)) }
             },

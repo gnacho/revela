@@ -271,4 +271,6 @@
     <string name="delete_original_done">Original photo deleted</string>
     <string name="delete_original_error">Could not delete the original photo</string>
     <string name="delete_original_repick">This photo was opened with the old picker and cannot be deleted. Open it with Open photo to delete it.</string>
+    <string name="note_saved">Note saved</string>
+    <string name="note_error">Could not save the note</string>
 </resources>

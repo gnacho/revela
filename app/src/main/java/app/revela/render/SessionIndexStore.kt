@@ -107,14 +107,14 @@ object SessionIndexStore {
         indexFile(dir).writeText(SessionIndexCodec.toJson(entries))
     }
 
-    /** Nota libre asociada a una sesion (cadena vacia = sin nota). */
-    fun setNote(dir: File, id: String, note: String) {
-        runCatching {
-            val entries = SessionIndexCodec.fromJson(indexFile(dir).readTextIfExists())
-            val updated = entries.map { if (it.id == id) it.copy(note = note) else it }
-            indexFile(dir).writeText(SessionIndexCodec.toJson(updated))
-        }
-    }
+    /** Nota libre asociada a una sesion (cadena vacia = sin nota). Devuelve true si actualizo una entrada. */
+    fun setNote(dir: File, id: String, note: String): Boolean = runCatching {
+        val entries = SessionIndexCodec.fromJson(indexFile(dir).readTextIfExists())
+        if (entries.none { it.id == id }) return@runCatching false
+        val updated = entries.map { if (it.id == id) it.copy(note = note) else it }
+        indexFile(dir).writeText(SessionIndexCodec.toJson(updated))
+        true
+    }.getOrDefault(false)
 
     /** True si la sesion tiene al menos un Edit.Look aplicado. */
     fun hasLook(dir: File, id: String): Boolean =
