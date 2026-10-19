@@ -14,6 +14,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -1282,21 +1283,22 @@ fun EditorScreen(
                 }) { Icon(Icons.Outlined.Check, stringResource(R.string.done), tint = Ui.icon) }
             }
         }
-        // Con un panel abierto (Herramientas/Estilos) la foto sube como franja superior
-        // siempre visible; con herramienta activa o nada abierto, ocupa todo el espacio.
-        // La transicion se ANIMA con animateContentSize: interpola el tamano de la foto
-        // entre weight(1f) y height(200dp) SIN medir nada (la medida con onSizeChanged
-        // entro en bucle de realimentacion y encogia la foto).
+        // La foto SIEMPRE esta completa y visible: sin panel ocupa toda la caja; con el panel
+        // abierto se reencuadra suavemente en la zona de encima del panel (patron Snapseed,
+        // issue #2). El panel sube por debajo con un velo.
         val panelOpen = activeTool == null && bottomTab != BottomTab.NONE && base != null
+        val photoFrac by animateFloatAsState(
+            targetValue = if (panelOpen) 0.3f else 1f,
+            animationSpec = tween(280, easing = FastOutSlowInEasing),
+            label = "photoFrac"
+        )
+        Box(modifier = Modifier.weight(1f)) {
         BoxWithConstraints(
             modifier = Modifier
+                .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .animateContentSize(spring(dampingRatio = 0.85f, stiffness = 320f))
-                .then(
-                    if (panelOpen) Modifier.height(200.dp)
-                    else Modifier.weight(1f)
-                )
-                .padding(horizontal = 16.dp, vertical = if (panelOpen) 8.dp else 14.dp),
+                .fillMaxHeight(photoFrac)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             contentAlignment = Alignment.Center
         ) {
             val density = LocalDensity.current
@@ -2910,13 +2912,24 @@ fun EditorScreen(
                 }
             }
         }
-        // Panel de herramientas en ESPACIO REAL bajo la franja de la foto, entra deslizandose.
-        // El weight va en el AnimatedVisibility (hijo directo de la Column) para que la barra
-        // de pestanas quede SIEMPRE abajo aunque el panel este animandose.
-        AnimatedVisibility(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+        // Velo sobre la foto mientras un panel esta abierto; tocarlo cierra el panel
+        androidx.compose.animation.AnimatedVisibility(
+            visible = panelOpen,
+            enter = fadeIn(tween(160)),
+            exit = fadeOut(tween(120))
+        ) {
+            // fillMaxSize (NO matchParentSize: dentro de AnimatedVisibility el scope no es
+            // BoxScope y matchParentSize es un no-op de 0x0)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0x59000000))
+                    .clickable { bottomTab = BottomTab.NONE }
+            )
+        }
+        // Panel de herramientas: sube por encima de la parte inferior de la foto
+        androidx.compose.animation.AnimatedVisibility(
+            modifier = Modifier.align(Alignment.BottomCenter),
             visible = activeTool == null && bottomTab == BottomTab.TOOLS && base != null,
             enter = slideInVertically(
                 initialOffsetY = { it },
@@ -2927,23 +2940,27 @@ fun EditorScreen(
                 animationSpec = tween(150, easing = FastOutSlowInEasing)
             ) + fadeOut(tween(150))
         ) {
-            ToolsGrid(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                favorites = favorites.toSet(),
-                onToggleFavorite = { toggleFavorite(it) },
-                onSelect = {
-                    activeTool = it
-                    bottomTab = BottomTab.NONE
-                }
-            )
+                    .fillMaxHeight(0.7f)
+                    .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                    .background(Ui.sheet)
+            ) {
+                ToolsGrid(
+                    modifier = Modifier.fillMaxSize(),
+                    favorites = favorites.toSet(),
+                    onToggleFavorite = { toggleFavorite(it) },
+                    onSelect = {
+                        activeTool = it
+                        bottomTab = BottomTab.NONE
+                    }
+                )
+            }
         }
-        // Carrusel de estilos en espacio real bajo la franja de la foto, entra deslizandose
-        AnimatedVisibility(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+        // Carrusel de estilos: sube por encima de la parte inferior de la foto
+        androidx.compose.animation.AnimatedVisibility(
+            modifier = Modifier.align(Alignment.BottomCenter),
             visible = activeTool == null && bottomTab == BottomTab.LOOKS && base != null,
             enter = slideInVertically(
                 initialOffsetY = { it },
@@ -2955,37 +2972,51 @@ fun EditorScreen(
             ) + fadeOut(tween(150))
         ) {
             if (activeTool == null && base != null) {
-            LooksCarousel(
-                thumbs = lookThumbs,
-                selectedId = stack.edits.filterIsInstance<Edit.Look>().lastOrNull()?.id ?: "none",
-                onSelect = { look ->
-                    if (look.id == "none") stack.removeTool(Tool.LOOK)
-                    else stack.apply(Edit.Look(look.id))
-                    stackVersion++
-                    persistSession()
-                },
-                customStyles = customStyles,
-                customThumbs = customThumbs,
-                selectedCustomId = selectedCustomId,
-                onSelectCustom = { cs ->
-                    runCatching { EditStack.fromJson(cs.editsJson) }.getOrNull()?.let { st ->
-                        stack = st
-                        selectedCustomId = cs.id
-                        stackVersion++
-                        persistSession()
-                    }
-                },
-                onDeleteCustom = { deleteStyle = it },
-                onManageCustom = {
-                    manageStyle = it
-                    manageName = it.name
-                },
-                onSaveNew = {
-                    styleName = ""
-                    showStyleNameDialog = true
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.7f)
+                    .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                    .background(Ui.sheet)
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LooksCarousel(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth(),
+                        thumbs = lookThumbs,
+                        selectedId = stack.edits.filterIsInstance<Edit.Look>().lastOrNull()?.id ?: "none",
+                        onSelect = { look ->
+                            if (look.id == "none") stack.removeTool(Tool.LOOK)
+                            else stack.apply(Edit.Look(look.id))
+                            stackVersion++
+                            persistSession()
+                        },
+                        customStyles = customStyles,
+                        customThumbs = customThumbs,
+                        selectedCustomId = selectedCustomId,
+                        onSelectCustom = { cs ->
+                            runCatching { EditStack.fromJson(cs.editsJson) }.getOrNull()?.let { st ->
+                                stack = st
+                                selectedCustomId = cs.id
+                                stackVersion++
+                                persistSession()
+                            }
+                        },
+                        onDeleteCustom = { deleteStyle = it },
+                        onManageCustom = {
+                            manageStyle = it
+                            manageName = it.name
+                        },
+                        onSaveNew = {
+                            styleName = ""
+                            showStyleNameDialog = true
+                        }
+                    )
                 }
-            )
             }
+            }
+        }
         }
         // La barra de favoritos solo vive sin paneles: al abrir Estilos/Herramientas se va
         // deslizandose hacia abajo (issue #2: antes quedaba visible en Estilos).
@@ -4211,6 +4242,7 @@ fun ToolsGrid(
 /** Carrusel de estilos con miniaturas de la foto real filtrada en vivo. */
 @Composable
 fun LooksCarousel(
+    modifier: Modifier = Modifier,
     thumbs: Map<String, ImageBitmap>,
     selectedId: String,
     onSelect: (Look) -> Unit,
@@ -4223,8 +4255,7 @@ fun LooksCarousel(
     onSaveNew: () -> Unit = {}
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .background(Ui.bg)
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 10.dp, vertical = 8.dp),
