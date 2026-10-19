@@ -127,7 +127,8 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(refreshTick, appSettings.sortMode) { reload() }
+    // Tocar "Con nota" relee el indice: una nota puede haberse guardado en otra pantalla
+    LaunchedEffect(refreshTick, appSettings.sortMode, filter) { reload() }
 
     val pickerLauncher = rememberLauncherForActivityResult(
         OpenImageDocument()
