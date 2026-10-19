@@ -156,6 +156,8 @@ import app.revela.core.Look
 import app.revela.core.Tool
 import app.revela.render.BaseImage
 import app.revela.core.EffectiveAdjustments
+import app.revela.core.HiddenLayers
+import app.revela.core.LayerList
 import app.revela.render.ExportOptions
 import app.revela.render.ExportProcessor
 import app.revela.render.PreviewRender
@@ -228,6 +230,34 @@ import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.outlined.FilterBAndW
 import androidx.compose.ui.graphics.asAndroidBitmap
 import java.io.ByteArrayOutputStream
+
+/** Nombre legible de la herramienta que genero una capa (0 si no tiene mapeo). */
+@StringRes
+fun toolLabelRes(toolId: String): Int = when (toolId.substringBefore(':')) {
+    Tool.EXPOSURE, Tool.CONTRAST, Tool.SATURATION -> R.string.tool_tune
+    Tool.CURVES -> R.string.tool_curves
+    Tool.TONAL -> R.string.tool_tone
+    Tool.VIGNETTE -> R.string.tool_vignette
+    Tool.HEAL -> R.string.tool_heal
+    Tool.CROP -> R.string.tool_crop
+    Tool.PERSPECTIVE -> R.string.tool_perspective
+    Tool.EXPAND -> R.string.tool_expand
+    Tool.SELECTIVE -> R.string.tool_selective
+    Tool.BRUSH -> R.string.tool_brush
+    Tool.HEAD_POSE -> R.string.tool_head_pose
+    Tool.BNW -> R.string.tool_bnw
+    Tool.WHITE_BALANCE -> R.string.tool_white_balance
+    Tool.DETAILS -> R.string.tool_details
+    Tool.HDR -> R.string.tool_hdr
+    Tool.GRAIN -> R.string.tool_grain
+    Tool.GLOW -> R.string.tool_glow
+    Tool.LENS_BLUR -> R.string.tool_lens_blur
+    Tool.DOUBLE_EXPO -> R.string.tool_double_expo
+    Tool.TEXT -> R.string.tool_text
+    Tool.FRAME -> R.string.tool_frame
+    Tool.LOOK -> R.string.tool_looks
+    else -> 0
+}
 
 enum class EditorTool(val id: String) {
     TUNE("tune"),
@@ -578,6 +608,8 @@ fun EditorScreen(
         }
     }
     var showRevertConfirm by remember { mutableStateOf(false) }
+    var showLayers by remember { mutableStateOf(false) }
+    var hiddenLayers by remember { mutableStateOf<Set<String>>(emptySet()) }
     var lookThumbs by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
 
     // Estilos personalizados
@@ -796,7 +828,33 @@ fun EditorScreen(
             val toolIds = pk.toolIds()
             list = list.filterNot { it.toolId in toolIds } + pk.edits(workingPresetIntensity)
         }
-        return list
+        // Capas ocultas: se conservan en la pila (y en el JSON) pero no se pintan
+        return list.filterNot { it.toolId in hiddenLayers }
+    }
+
+    /** Etiqueta legible de una capa (nombre de la herramienta que la genero). */
+    fun layerLabel(edit: Edit): String {
+        val res = toolLabelRes(edit.toolId)
+        return if (res != 0) context.getString(res) else edit.toolId
+    }
+
+    /** Herramienta que reabre una capa ("brush:temperature" -> BRUSH). */
+    fun openToolForLayer(toolId: String): EditorTool? {
+        val base = toolId.substringBefore(':')
+        EditorTool.entries.firstOrNull { it.id == base }?.let { return it }
+        // Las capas de valor suelto viven dentro de Ajustar imagen
+        return when (base) {
+            Tool.EXPOSURE, Tool.CONTRAST, Tool.SATURATION -> EditorTool.TUNE
+            else -> null
+        }
+    }
+
+    /** Id de sesion de la foto abierta (clave de las capas ocultas). */
+    fun currentSessionId(): String? = sourceUri?.let { SessionIndexStore.idFor(it.toString()) }
+
+    fun persistHidden() {
+        val id = currentSessionId() ?: return
+        HiddenLayers.save(context.filesDir, id, hiddenLayers)
     }
 
     /** Filtro B/N comprometido en la pila (o null si no hay). */
@@ -905,6 +963,7 @@ fun EditorScreen(
         base = loaded
         originalBitmap = loaded.toBitmap()
         sourceUri = target
+        hiddenLayers = HiddenLayers.load(context.filesDir, SessionIndexStore.idFor(target.toString()))
         val restored = initialSessionId?.let { SessionIndexStore.load(context.filesDir, it) }
             ?: SessionStore.load(context, target)
         stack = restored?.first ?: EditStack()
@@ -1073,6 +1132,14 @@ fun EditorScreen(
                                 } else ""
                                 showNote = true
                             }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.layers_menu)) },
+                            onClick = {
+                                showMenu = false
+                                showLayers = true
+                            },
+                            enabled = stack.edits.isNotEmpty()
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.revert_all)) },
@@ -3138,6 +3205,58 @@ fun EditorScreen(
                     Text(stringResource(R.string.cancel))
                 }
             }
+        )
+    }
+
+    if (showLayers) {
+        val rows = LayerList.rows(stack.edits, hiddenLayers) { layerLabel(it) }
+        LayersSheet(
+            rows = rows,
+            canUndo = stack.canUndo,
+            canRedo = stack.canRedo,
+            canRevert = stack.edits.isNotEmpty() || geometry != GeometryModel(),
+            onUndo = {
+                if (stack.undo()) {
+                    stackVersion++
+                    persistSession()
+                    persistHidden()
+                }
+            },
+            onRedo = {
+                if (stack.redo()) {
+                    stackVersion++
+                    persistSession()
+                    persistHidden()
+                }
+            },
+            onRevert = {
+                stack.reset(emptyList())
+                geometry = GeometryModel()
+                hiddenLayers = emptySet()
+                stackVersion++
+                persistSession()
+                persistHidden()
+            },
+            onToggle = { row ->
+                hiddenLayers = if (row.hidden) hiddenLayers - row.toolId else hiddenLayers + row.toolId
+                stackVersion++
+                persistHidden()
+            },
+            onEdit = { row ->
+                showLayers = false
+                openToolForLayer(row.toolId)?.let { tool ->
+                    activeTool = tool
+                    bottomTab = BottomTab.NONE
+                }
+            },
+            onDelete = { row ->
+                stack.removeTool(row.toolId)
+                hiddenLayers = hiddenLayers - row.toolId
+                stackVersion++
+                persistSession()
+                persistHidden()
+            },
+            onDismiss = { showLayers = false }
         )
     }
 

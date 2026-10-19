@@ -51,6 +51,7 @@
     <string name="tool_tone">Tonal contrast</string>
     <string name="tool_drama">Drama</string>
     <string name="tool_vintage">Vintage</string>
+    <string name="tool_grain">Film grain</string>
     <string name="tool_grainy_film">Grainy film</string>
     <string name="tool_retrolux">Retrolux</string>
     <string name="tool_grunge">Grunge</string>
@@ -62,6 +63,7 @@
     <string name="tool_vignette">Vignette</string>
     <string name="tool_double_expo">Double exposure</string>
     <string name="tool_text">Text</string>
+    <string name="tool_looks">Looks</string>
     <string name="tool_frame">Frames</string>
 
     <!-- Looks carousel -->
@@ -273,4 +275,15 @@
     <string name="delete_original_repick">This photo was opened with the old picker and cannot be deleted. Open it with Open photo to delete it.</string>
     <string name="note_saved">Note saved</string>
     <string name="note_error">Could not save the note</string>
+
+    <!-- Capas / stack de ediciones -->
+    <string name="layers_title">Edits</string>
+    <string name="layers_menu">View edits</string>
+    <string name="layers_empty">No edits applied yet.</string>
+    <string name="layer_show">Show layer</string>
+    <string name="layer_hide">Hide layer</string>
+    <string name="layers_undo">Undo</string>
+    <string name="layers_redo">Redo</string>
+    <string name="layers_revert">Revert all</string>
+    <string name="layer_delete">Delete layer</string>
 </resources>

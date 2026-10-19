@@ -249,6 +249,18 @@ class EditStack(initialEdits: List<Edit> = emptyList()) {
         return true
     }
 
+    /**
+     * Sustituye el edit de una capa CONSERVANDO su posicion en la pila (a diferencia de apply,
+     * que la manda al final). Es lo que necesita el editor de capas al retocar una ya aplicada.
+     */
+    fun replaceInPlace(edit: Edit): Boolean {
+        val index = current.indexOfFirst { it.toolId == edit.toolId }
+        if (index < 0) return false
+        pushUndo()
+        current = current.toMutableList().apply { set(index, edit) }
+        return true
+    }
+
     fun undo(): Boolean {
         val previous = undoStack.removeLastOrNull() ?: return false
         redoStack.addLast(current)
