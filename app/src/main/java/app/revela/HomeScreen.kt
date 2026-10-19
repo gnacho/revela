@@ -134,9 +134,10 @@ fun HomeScreen(
         OpenImageDocument()
     ) { uri: Uri? ->
         if (uri != null) {
+            // GetContent no concede permiso persistente: el de escritura se pide solo al borrar
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
-                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             }
             onOpenPhoto(uri)
@@ -198,7 +199,7 @@ fun HomeScreen(
                 )
             }
             IconButton(onClick = {
-                pickerLauncher.launch(arrayOf("image/*"))
+                pickerLauncher.launch("image/*")
             }) {
                 Icon(Icons.Filled.AddPhotoAlternate, stringResource(R.string.open_photo), tint = Ui.icon)
             }

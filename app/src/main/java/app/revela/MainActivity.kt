@@ -601,6 +601,20 @@ fun EditorScreen(
 
     fun deleteOriginalPhoto() {
         val u = sourceUri ?: return
+        val esPicker = u.authority?.contains("photopicker") == true || u.path?.contains("/picker/") == true
+        // Con GetContent no llega permiso de escritura, asi que el camino fiable es el dialogo
+        // del sistema (createDeleteRequest), que funciona tambien con URIs de documentos.
+        if (!esPicker) {
+            val launch = runCatching {
+                val pi = android.provider.MediaStore.createDeleteRequest(context.contentResolver, listOf(u))
+                deleteRequestLauncher.launch(
+                    androidx.activity.result.IntentSenderRequest.Builder(pi.intentSender).build()
+                )
+                true
+            }.getOrDefault(false)
+            if (launch) return
+        }
+        // Intento directo (solo funciona si el proveedor ya nos dio escritura)
         val deleted = runCatching {
             if (android.provider.DocumentsContract.isDocumentUri(context, u)) {
                 android.provider.DocumentsContract.deleteDocument(context.contentResolver, u)
@@ -612,17 +626,7 @@ fun EditorScreen(
             Toast.makeText(context, context.getString(R.string.delete_original_done), Toast.LENGTH_SHORT).show()
             return
         }
-        val esPicker = u.authority?.contains("photopicker") == true || u.path?.contains("/picker/") == true
-        if (!esPicker && android.os.Build.VERSION.SDK_INT >= 30) {
-            runCatching {
-                val pi = android.provider.MediaStore.createDeleteRequest(context.contentResolver, listOf(u))
-                deleteRequestLauncher.launch(
-                    androidx.activity.result.IntentSenderRequest.Builder(pi.intentSender).build()
-                )
-            }.onFailure {
-                Toast.makeText(context, context.getString(R.string.delete_original_error), Toast.LENGTH_SHORT).show()
-            }
-        } else if (esPicker) {
+        if (esPicker) {
             Toast.makeText(context, context.getString(R.string.delete_original_repick), Toast.LENGTH_LONG).show()
         } else {
             Toast.makeText(context, context.getString(R.string.delete_original_error), Toast.LENGTH_SHORT).show()
@@ -922,11 +926,10 @@ fun EditorScreen(
         OpenImageDocument()
     ) { uri: Uri? ->
         if (uri != null) {
+            // GetContent no concede permiso persistente: el de escritura se pide solo al borrar
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             }
             scope.launch {
@@ -1088,7 +1091,7 @@ fun EditorScreen(
                 }
             }) { Icon(Icons.Outlined.Home, stringResource(R.string.back_to_library), tint = Ui.icon) }
             TextButton(onClick = {
-                pickerLauncher.launch(arrayOf("image/*"))
+                pickerLauncher.launch("image/*")
             }) {
                 Text(
                     stringResource(R.string.open),
@@ -1162,8 +1165,7 @@ fun EditorScreen(
                             onClick = {
                                 showMenu = false
                                 showLayers = true
-                            },
-                            enabled = stack.edits.isNotEmpty()
+                            }
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.revert_all)) },
@@ -1298,7 +1300,7 @@ fun EditorScreen(
             val bmp = if (showOriginal) originalBitmap else preview
             if (b == null || bmp == null) {
                 Button(onClick = {
-                    pickerLauncher.launch(arrayOf("image/*"))
+                    pickerLauncher.launch("image/*")
                 }) { Text(stringResource(R.string.open_photo)) }
             } else {
                 val inCrop = activeTool == EditorTool.CROP
