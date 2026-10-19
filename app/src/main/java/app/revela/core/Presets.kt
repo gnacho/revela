@@ -1,5 +1,8 @@
 package app.revela.core
 
+import androidx.annotation.StringRes
+import app.revela.R
+
 /**
  * Recetas de "panel-preset" estilo Snapseed: combinan edits YA existentes (sin stages nuevos).
  * La intensidad 0..1 escala los valores; en 0 la receta es no-op (lista vacia) salvo Noir,
@@ -7,14 +10,14 @@ package app.revela.core
  */
 object Presets {
 
-    enum class Kind(val id: String, val label: String) {
-        DRAMA("drama", "Drama"),
-        VINTAGE("vintage", "Vintage"),
-        GRAINY_FILM("grainyFilm", "Pelicula granulada"),
-        RETROLUX("retrolux", "Retrolux"),
-        GRUNGE("grunge", "Grunge"),
-        NOIR("noir", "Noir"),
-        PORTRAIT("portrait", "Retrato");
+    enum class Kind(val id: String, @StringRes val labelRes: Int) {
+        DRAMA("drama", R.string.tool_drama),
+        VINTAGE("vintage", R.string.tool_vintage),
+        GRAINY_FILM("grainyFilm", R.string.tool_grainy_film),
+        RETROLUX("retrolux", R.string.tool_retrolux),
+        GRUNGE("grunge", R.string.tool_grunge),
+        NOIR("noir", R.string.tool_noir),
+        PORTRAIT("portrait", R.string.tool_portrait);
 
         /** Edits que escribe el preset a una intensidad dada (no-op si t <= 0). */
         fun edits(t: Float): List<Edit> {

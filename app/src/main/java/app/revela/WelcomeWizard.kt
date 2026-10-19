@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,18 +72,18 @@ fun WelcomeWizard(onFinish: () -> Unit) {
             val (icon, title, body) = when (p) {
                 0 -> Triple(
                     Icons.Filled.Palette,
-                    "Bienvenido a revela",
-                    "Edicion fotografica rapida al estilo Snapseed: ajustes reales, sin filtros de broma."
+                    stringResource(R.string.welcome_title),
+                    stringResource(R.string.welcome_body1)
                 )
                 1 -> Triple(
                     Icons.Filled.Lock,
-                    "100% offline",
-                    "Sin cuentas y sin nube. Tus fotos nunca salen del dispositivo."
+                    stringResource(R.string.welcome_title2),
+                    stringResource(R.string.welcome_body2)
                 )
                 else -> Triple(
                     Icons.Filled.TouchApp,
-                    "El gesto clave",
-                    "En Ajustar imagen: arrastra en vertical para elegir parametro y en horizontal para el valor. La varita mejora tu foto al instante."
+                    stringResource(R.string.welcome_title3),
+                    stringResource(R.string.welcome_body3)
                 )
             }
             Column(
@@ -134,10 +135,10 @@ fun WelcomeWizard(onFinish: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onFinish) { Text("Saltar", color = Color.Gray) }
+            TextButton(onClick = onFinish) { Text(stringResource(R.string.skip), color = Color.Gray) }
             Spacer(Modifier.weight(1f))
             Button(onClick = { if (page < 2) page++ else onFinish() }) {
-                Text(if (page < 2) "Siguiente" else "Empezar")
+                Text(if (page < 2) stringResource(R.string.next) else stringResource(R.string.start))
             }
         }
         Spacer(Modifier.height(8.dp))

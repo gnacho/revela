@@ -10,7 +10,8 @@ data class AppSettings(
     val exportPng: Boolean = false,
     val exportQuality: Int = 92,
     val sortMode: String = "recent",   // recent | oldest | name_az | name_za
-    val viewMode: String = "grid"      // grid | list
+    val viewMode: String = "grid",     // grid | list
+    val language: String = "system"    // system | es | en
 )
 
 object SettingsStore {

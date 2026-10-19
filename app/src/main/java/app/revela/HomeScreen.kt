@@ -1,5 +1,6 @@
 package app.revela
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -60,6 +61,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,10 +73,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 val SORT_OPTIONS = listOf(
-    "recent" to "Más recientes",
-    "oldest" to "Más antiguas",
-    "name_az" to "Nombre (A-Z)",
-    "name_za" to "Nombre (Z-A)"
+    "recent" to R.string.sort_recent,
+    "oldest" to R.string.sort_oldest,
+    "name_az" to R.string.sort_name_az,
+    "name_za" to R.string.sort_name_za
 )
 
 fun sortedEntries(entries: List<SessionEntry>, sortMode: String): List<SessionEntry> = when (sortMode) {
@@ -146,7 +148,7 @@ fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "revela",
+                stringResource(R.string.app_name),
                 color = Ui.text,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.SemiBold
@@ -155,14 +157,14 @@ fun HomeScreen(
             // Ordenacion
             Box {
                 IconButton(onClick = { sortMenuOpen = true }) {
-                    Icon(Icons.Outlined.Sort, "Ordenar fotos", tint = Ui.icon)
+                    Icon(Icons.Outlined.Sort, stringResource(R.string.sort_photos), tint = Ui.icon)
                 }
                 DropdownMenu(expanded = sortMenuOpen, onDismissRequest = { sortMenuOpen = false }) {
                     SORT_OPTIONS.forEach { (id, label) ->
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    label,
+                                    stringResource(label),
                                     color = if (appSettings.sortMode == id) Ui.accent else Ui.text,
                                     fontWeight = if (appSettings.sortMode == id) FontWeight.SemiBold else FontWeight.Normal
                                 )
@@ -183,7 +185,7 @@ fun HomeScreen(
             }) {
                 Icon(
                     if (appSettings.viewMode == "grid") Icons.Outlined.ViewList else Icons.Outlined.ViewModule,
-                    "Cambiar vista",
+                    stringResource(R.string.toggle_view),
                     tint = Ui.icon
                 )
             }
@@ -192,7 +194,7 @@ fun HomeScreen(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                 )
             }) {
-                Icon(Icons.Filled.AddPhotoAlternate, "Abrir foto", tint = Ui.icon)
+                Icon(Icons.Filled.AddPhotoAlternate, stringResource(R.string.open_photo), tint = Ui.icon)
             }
         }
 
@@ -204,7 +206,7 @@ fun HomeScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    "Todavia no hay ediciones.\nAbre una foto con el boton +.",
+                    stringResource(R.string.empty_library),
                     color = Ui.textDim,
                     fontSize = 15.sp,
                     lineHeight = 22.sp
@@ -261,7 +263,7 @@ fun HomeScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                relativeTime(entry.lastOpenedAt),
+                                relativeTime(context, entry.lastOpenedAt),
                                 color = Ui.textDim,
                                 fontSize = 12.sp
                             )
@@ -269,7 +271,7 @@ fun HomeScreen(
                         IconButton(onClick = { confirmDelete = entry }) {
                             Icon(
                                 Icons.Filled.Delete,
-                                contentDescription = "Eliminar sesion",
+                                contentDescription = stringResource(R.string.delete_session),
                                 tint = Ui.textDim,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -323,7 +325,7 @@ fun HomeScreen(
                             ) {
                                 Icon(
                                     Icons.Filled.Delete,
-                                    contentDescription = "Eliminar sesion",
+                                    contentDescription = stringResource(R.string.delete_session),
                                     tint = Color.White,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -338,7 +340,7 @@ fun HomeScreen(
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         Text(
-                            relativeTime(entry.lastOpenedAt),
+                            relativeTime(context, entry.lastOpenedAt),
                             color = Ui.textDim,
                             fontSize = 10.sp,
                             maxLines = 1
@@ -352,10 +354,10 @@ fun HomeScreen(
     confirmDelete?.let { entry ->
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
-            title = { Text("Eliminar edicion", color = Ui.text) },
+            title = { Text(stringResource(R.string.delete_edit), color = Ui.text) },
             text = {
                 Text(
-                    "Se borraran los ajustes guardados de \"${entry.displayName}\". La foto original no se toca.",
+                    stringResource(R.string.delete_session_message, entry.displayName),
                     color = Ui.textDim
                 )
             },
@@ -364,21 +366,21 @@ fun HomeScreen(
                     SessionIndexStore.delete(context.filesDir, entry.id)
                     confirmDelete = null
                     reload()
-                }) { Text("Eliminar", color = Color(0xFFD32F2F)) }
+                }) { Text(stringResource(R.string.delete), color = Color(0xFFD32F2F)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDelete = null }) { Text("Cancelar", color = Ui.text) }
+                TextButton(onClick = { confirmDelete = null }) { Text(stringResource(R.string.cancel), color = Ui.text) }
             }
         )
     }
 }
 
-internal fun relativeTime(thenMs: Long): String {
+internal fun relativeTime(context: Context, thenMs: Long): String {
     val diff = System.currentTimeMillis() - thenMs
-    if (diff < 60_000) return "ahora"
-    if (diff < 3_600_000) return "hace ${diff / 60_000} min"
-    if (diff < 86_400_000) return "hace ${diff / 3_600_000} h"
-    if (diff < 7L * 86_400_000) return "hace ${diff / 86_400_000} d"
+    if (diff < 60_000) return context.getString(R.string.relative_now)
+    if (diff < 3_600_000) return context.getString(R.string.relative_minutes, diff / 60_000)
+    if (diff < 86_400_000) return context.getString(R.string.relative_hours, diff / 3_600_000)
+    if (diff < 7L * 86_400_000) return context.getString(R.string.relative_days, diff / 86_400_000)
     val days = diff / 86_400_000
-    return "hace $days d"
+    return context.getString(R.string.relative_days, days)
 }

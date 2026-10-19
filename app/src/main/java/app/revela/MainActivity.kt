@@ -1,5 +1,6 @@
 package app.revela
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
@@ -136,7 +137,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.annotation.StringRes
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
@@ -225,36 +228,36 @@ import androidx.compose.material.icons.outlined.FilterBAndW
 import androidx.compose.ui.graphics.asAndroidBitmap
 import java.io.ByteArrayOutputStream
 
-enum class EditorTool(val id: String, val label: String) {
-    TUNE("tune", "Ajustar imagen"),
-    CURVES(Tool.CURVES, "Curvas"),
-    TONE(Tool.TONAL, "Contraste tonal"),
-    VIGNETTE(Tool.VIGNETTE, "Vineta"),
-    HEAL(Tool.HEAL, "Corrector"),
-    CROP(Tool.CROP, "Recortar"),
-    ROTATE("rotate", "Girar"),
-    PERSPECTIVE(Tool.PERSPECTIVE, "Perspectiva"),
-    EXPAND(Tool.EXPAND, "Expandir"),
-    SELECTIVE(Tool.SELECTIVE, "Selectivo"),
-    BRUSH(Tool.BRUSH, "Pincel"),
-    HEAD_POSE(Tool.HEAD_POSE, "Pose"),
-    BNW(Tool.BNW, "Blanco y negro"),
-    WB(Tool.WHITE_BALANCE, "Balance blancos"),
-    DETAILS(Tool.DETAILS, "Detalles"),
-    HDR(Tool.HDR, "HDR-scape"),
-    GRAIN(Tool.GRAIN, "Grano"),
-    GLOW(Tool.GLOW, "Brillo glamuroso"),
-    LENS_BLUR(Tool.LENS_BLUR, "Desenfoque"),
-    DRAMA("drama", "Drama"),
-    VINTAGE("vintage", "Vintage"),
-    GRAINY_FILM("grainyFilm", "Pelicula granulada"),
-    RETROLUX("retrolux", "Retrolux"),
-    GRUNGE("grunge", "Grunge"),
-    NOIR("noir", "Noir"),
-    PORTRAIT("portrait", "Retrato"),
-    DOUBLE_EXPO(Tool.DOUBLE_EXPO, "Doble exposicion"),
-    TEXT(Tool.TEXT, "Texto"),
-    FRAME(Tool.FRAME, "Marcos")
+enum class EditorTool(val id: String) {
+    TUNE("tune"),
+    CURVES(Tool.CURVES),
+    TONE(Tool.TONAL),
+    VIGNETTE(Tool.VIGNETTE),
+    HEAL(Tool.HEAL),
+    CROP(Tool.CROP),
+    ROTATE("rotate"),
+    PERSPECTIVE(Tool.PERSPECTIVE),
+    EXPAND(Tool.EXPAND),
+    SELECTIVE(Tool.SELECTIVE),
+    BRUSH(Tool.BRUSH),
+    HEAD_POSE(Tool.HEAD_POSE),
+    BNW(Tool.BNW),
+    WB(Tool.WHITE_BALANCE),
+    DETAILS(Tool.DETAILS),
+    HDR(Tool.HDR),
+    GRAIN(Tool.GRAIN),
+    GLOW(Tool.GLOW),
+    LENS_BLUR(Tool.LENS_BLUR),
+    DRAMA("drama"),
+    VINTAGE("vintage"),
+    GRAINY_FILM("grainyFilm"),
+    RETROLUX("retrolux"),
+    GRUNGE("grunge"),
+    NOIR("noir"),
+    PORTRAIT("portrait"),
+    DOUBLE_EXPO(Tool.DOUBLE_EXPO),
+    TEXT(Tool.TEXT),
+    FRAME(Tool.FRAME)
 }
 
 /** Receta de preset asociada a una herramienta (solo las 7 de preset). */
@@ -347,12 +350,12 @@ fun BottomTabs(
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         TabButton(
-            "ESTILOS", selected == BottomTab.LOOKS, enabled, Modifier.weight(1f)
+            stringResource(R.string.tab_looks), selected == BottomTab.LOOKS, enabled, Modifier.weight(1f)
         ) { onSelect(if (selected == BottomTab.LOOKS) BottomTab.NONE else BottomTab.LOOKS) }
         TabButton(
-            "HERRAMIENTAS", selected == BottomTab.TOOLS, enabled, Modifier.weight(1f)
+            stringResource(R.string.tab_tools), selected == BottomTab.TOOLS, enabled, Modifier.weight(1f)
         ) { onSelect(if (selected == BottomTab.TOOLS) BottomTab.NONE else BottomTab.TOOLS) }
-        TabButton("EXPORTAR", false, enabled, Modifier.weight(1f)) { onExport() }
+        TabButton(stringResource(R.string.tab_export), false, enabled, Modifier.weight(1f)) { onExport() }
     }
 }
 
@@ -383,19 +386,26 @@ fun TabButton(
 }
 
 /** Parametros de la herramienta Ajustar (gesto vertical para elegir, horizontal para valor). */
-enum class TuneParam(val toolId: String, val wbParam: WbParam, val label: String) {
-    EXPOSURE(Tool.EXPOSURE, WbParam.TEMPERATURE, "Exposicion"),
-    CONTRAST(Tool.CONTRAST, WbParam.TEMPERATURE, "Contraste"),
-    SATURATION(Tool.SATURATION, WbParam.TEMPERATURE, "Saturacion"),
-    TEMPERATURE(Tool.WHITE_BALANCE, WbParam.TEMPERATURE, "Temperatura"),
-    TINT(Tool.WHITE_BALANCE, WbParam.TINT, "Tinte")
+enum class TuneParam(val toolId: String, val wbParam: WbParam, @StringRes val labelRes: Int) {
+    EXPOSURE(Tool.EXPOSURE, WbParam.TEMPERATURE, R.string.exposure),
+    CONTRAST(Tool.CONTRAST, WbParam.TEMPERATURE, R.string.contrast),
+    SATURATION(Tool.SATURATION, WbParam.TEMPERATURE, R.string.saturation),
+    TEMPERATURE(Tool.WHITE_BALANCE, WbParam.TEMPERATURE, R.string.temperature),
+    TINT(Tool.WHITE_BALANCE, WbParam.TINT, R.string.tint)
 }
 
-enum class SelParam(val label: String) {
-    BRIGHTNESS("Brillo"), CONTRAST("Contraste"), SATURATION("Saturacion")
+enum class SelParam(@StringRes val labelRes: Int) {
+    BRIGHTNESS(R.string.brightness), CONTRAST(R.string.contrast), SATURATION(R.string.saturation)
 }
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        val lang = runCatching {
+            app.revela.core.SettingsStore.load(newBase.filesDir).language
+        }.getOrDefault("system")
+        super.attachBaseContext(app.revela.core.LocaleHelper.apply(newBase, lang))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
@@ -832,7 +842,7 @@ fun EditorScreen(
         val loaded = PreviewRender.decode(context.contentResolver, target)
         if (loaded == null) {
             android.util.Log.w("revela", "no se pudo abrir $target")
-            Toast.makeText(context, "No se pudo abrir la foto", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.cannot_open_photo), Toast.LENGTH_SHORT).show()
             onHome()
             return@LaunchedEffect
         }
@@ -937,14 +947,14 @@ fun EditorScreen(
                     flushThumb()
                     onHome()
                 }
-            }) { Icon(Icons.Outlined.Home, "Biblioteca", tint = Ui.icon) }
+            }) { Icon(Icons.Outlined.Home, stringResource(R.string.back_to_library), tint = Ui.icon) }
             TextButton(onClick = {
                 pickerLauncher.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                 )
             }) {
                 Text(
-                    "ABRIR",
+                    stringResource(R.string.open),
                     color = Ui.textDim,
                     fontSize = 16.sp,
                     letterSpacing = 1.sp,
@@ -962,7 +972,7 @@ fun EditorScreen(
                         }
                     },
                     enabled = stack.canUndo
-                ) { Icon(Icons.AutoMirrored.Outlined.Undo, "Deshacer", tint = Ui.icon) }
+                ) { Icon(Icons.AutoMirrored.Outlined.Undo, stringResource(R.string.undo), tint = Ui.icon) }
                 IconButton(
                     onClick = {
                         if (stack.redo()) {
@@ -971,7 +981,7 @@ fun EditorScreen(
                         }
                     },
                     enabled = stack.canRedo
-                ) { Icon(Icons.AutoMirrored.Outlined.Redo, "Rehacer", tint = Ui.icon) }
+                ) { Icon(Icons.AutoMirrored.Outlined.Redo, stringResource(R.string.redo), tint = Ui.icon) }
                 IconButton(
                     onClick = {},
                     modifier = Modifier.pointerInput(sourceUri) {
@@ -983,22 +993,22 @@ fun EditorScreen(
                             }
                         )
                     }
-                ) { Icon(Icons.Outlined.Visibility, "Comparar con el original", tint = Ui.icon) }
+                ) { Icon(Icons.Outlined.Visibility, stringResource(R.string.compare_original), tint = Ui.icon) }
                 Box {
                     IconButton(
                         onClick = { showMenu = true },
                         enabled = sourceUri != null
-                    ) { Icon(Icons.Outlined.MoreVert, "Menu", tint = Ui.icon) }
+                    ) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.menu), tint = Ui.icon) }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                         DropdownMenuItem(
-                            text = { Text("Detalles de la imagen") },
+                            text = { Text(stringResource(R.string.image_details)) },
                             onClick = {
                                 showMenu = false
                                 showImageDetails = true
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Revertir todo") },
+                            text = { Text(stringResource(R.string.revert_all)) },
                             onClick = {
                                 showMenu = false
                                 showRevertConfirm = true
@@ -1006,14 +1016,14 @@ fun EditorScreen(
                             enabled = stack.edits.isNotEmpty() || geometry != GeometryModel()
                         )
                         DropdownMenuItem(
-                            text = { Text("Configuracion") },
+                            text = { Text(stringResource(R.string.settings)) },
                             onClick = {
                                 showMenu = false
                                 showSettings = true
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Acerca de") },
+                            text = { Text(stringResource(R.string.about)) },
                             onClick = {
                                 showMenu = false
                                 showAbout = true
@@ -1034,7 +1044,7 @@ fun EditorScreen(
                     strokeY.clear()
                     workingEdit = null
                     workingPresetIntensity = Float.NaN
-                }) { Icon(Icons.Outlined.Close, "Cerrar herramienta", tint = Ui.icon) }
+                }) { Icon(Icons.Outlined.Close, stringResource(R.string.close_tool), tint = Ui.icon) }
                 IconButton(onClick = {
                     when (activeTool) {
                         EditorTool.CROP -> {
@@ -1085,7 +1095,7 @@ fun EditorScreen(
                     activeTool = null
                     workingEdit = null
                     workingPresetIntensity = Float.NaN
-                }) { Icon(Icons.Outlined.Check, "Listo", tint = Ui.icon) }
+                }) { Icon(Icons.Outlined.Check, stringResource(R.string.done), tint = Ui.icon) }
             }
         }
         // Con un panel abierto (Herramientas/Estilos) la foto sube como franja superior
@@ -1112,7 +1122,7 @@ fun EditorScreen(
                     pickerLauncher.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                     )
-                }) { Text("Abrir foto") }
+                }) { Text(stringResource(R.string.open_photo)) }
             } else {
                 val inCrop = activeTool == EditorTool.CROP
                 val g = cropWorking ?: geometry
@@ -1687,7 +1697,7 @@ fun EditorScreen(
                                 ) {
                                     TuneParam.entries.forEach { p ->
                                         Text(
-                                            p.label,
+                                            stringResource(p.labelRes),
                                             color = if (p == tuneParam) Color.White else Color.Gray,
                                             fontSize = if (p == tuneParam) 16.sp else 13.sp,
                                             modifier = Modifier.padding(vertical = 6.dp)
@@ -1716,14 +1726,14 @@ fun EditorScreen(
                 val shown: Float
                 when (toolForValue) {
                     EditorTool.TUNE -> {
-                        label = tuneParam.label
+                        label = stringResource(tuneParam.labelRes)
                         range = EffectiveAdjustments.rangeFor(tuneParam.toolId)
                         shown = if (dragValue.isNaN()) {
                             EffectiveAdjustments.valueOf(effective(), tuneParam.toolId, tuneParam.wbParam)
                         } else dragValue
                     }
                     EditorTool.SELECTIVE -> {
-                        label = selParam.label
+                        label = stringResource(selParam.labelRes)
                         range = -1f..1f
                         val pts = stack.selectivePoints()
                         val wp = workingPoint
@@ -1738,7 +1748,7 @@ fun EditorScreen(
                         } else dragValue
                     }
                     else -> {
-                        label = "Viñeta"
+                        label = stringResource(R.string.tool_vignette)
                         range = 0f..1f
                         shown = if (workingVignette.isNaN()) {
                             stack.edits.filterIsInstance<Edit.Vignette>().firstOrNull()?.strength ?: 0f
@@ -1829,13 +1839,13 @@ fun EditorScreen(
                                                     selParam = p
                                                     dragValue = Float.NaN
                                                 },
-                                                label = { Text(p.label, fontSize = 12.sp) },
+                                                label = { Text(stringResource(p.labelRes), fontSize = 12.sp) },
                                                 modifier = Modifier.padding(horizontal = 4.dp)
                                             )
                                         }
                                     }
                                     Text(
-                                        "Toca para anadir punto (max 8) - arrastra el punto para moverlo - pulsacion larga para borrar - desliza en horizontal para ajustar",
+                                        stringResource(R.string.selective_hint),
                                         color = Ui.textDim,
                                         fontSize = 11.sp,
                                         textAlign = TextAlign.Center,
@@ -1853,7 +1863,7 @@ fun EditorScreen(
                                         stack.edits.filterIsInstance<Edit.Vignette>().firstOrNull()?.strength ?: 0f
                                     } else workingVignette
                                     Text(
-                                        "Intensidad: ${(currentV * 100).toInt()}%",
+                                        stringResource(R.string.intensity_percent, (currentV * 100).toInt()),
                                         color = Ui.text,
                                         fontSize = 13.sp
                                     )
@@ -1869,7 +1879,7 @@ fun EditorScreen(
                                             stackVersion++
                                             workingVignette = Float.NaN
                                             persistSession()
-                                        }) { Text("Quitar") }
+                                        }) { Text(stringResource(R.string.remove)) }
                                         Button(onClick = {
                                             val v = if (workingVignette.isNaN()) currentV else workingVignette
                                             stack.apply(Edit.Vignette(v))
@@ -1877,7 +1887,7 @@ fun EditorScreen(
                                             workingVignette = Float.NaN
                                             persistSession()
                                             activeTool = null
-                                        }) { Text("Aplicar") }
+                                        }) { Text(stringResource(R.string.apply)) }
                                     }
                                 }
 
@@ -1888,7 +1898,7 @@ fun EditorScreen(
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
-                                        "Brocha: ${(brushSize * 100).toInt()}%",
+                                        stringResource(R.string.brush_size_percent, (brushSize * 100).toInt()),
                                         color = Ui.text,
                                         fontSize = 13.sp
                                     )
@@ -1915,11 +1925,11 @@ fun EditorScreen(
                                                 }
                                             },
                                             enabled = strokeX.isNotEmpty()
-                                        ) { Text("Sanar zona") }
+                                        ) { Text(stringResource(R.string.heal_area)) }
                                         OutlinedButton(onClick = {
                                             strokeX.clear()
                                             strokeY.clear()
-                                        }) { Text("Descartar trazo") }
+                                        }) { Text(stringResource(R.string.discard_stroke)) }
                                     }
                                 }
 
@@ -1930,7 +1940,7 @@ fun EditorScreen(
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
-                                        "Perspectiva: arrastra los puntos azules sobre la foto",
+                                        stringResource(R.string.perspective_hint),
                                         color = Ui.text,
                                         fontSize = 13.sp
                                     )
@@ -1939,8 +1949,8 @@ fun EditorScreen(
                                         modifier = Modifier.padding(vertical = 6.dp)
                                     ) {
                                         listOf(
-                                            "free" to "Libre", "scale" to "Escala",
-                                            "tilt" to "Inclinar", "rotate" to "Rotar"
+                                            "free" to R.string.free, "scale" to R.string.scale,
+                                            "tilt" to R.string.tilt, "rotate" to R.string.rotate
                                         ).forEach { (id, label) ->
                                             FilterChip(
                                                 selected = perspMode == id,
@@ -1959,13 +1969,13 @@ fun EditorScreen(
                                                         workingEdit = Edit.Perspective(perspCorners, id)
                                                     }
                                                 },
-                                                label = { Text(label) }
+                                                label = { Text(stringResource(label)) }
                                             )
                                         }
                                     }
                                     if (perspMode == "rotate") {
                                         Text(
-                                            "Horizontal ${perspYaw.toInt()} grados",
+                                            stringResource(R.string.horizontal_degrees, perspYaw.toInt()),
                                             color = Ui.text, fontSize = 12.sp
                                         )
                                         Slider(
@@ -1981,7 +1991,7 @@ fun EditorScreen(
                                             valueRange = -30f..30f
                                         )
                                         Text(
-                                            "Vertical ${perspPitch.toInt()} grados",
+                                            stringResource(R.string.vertical_degrees, perspPitch.toInt()),
                                             color = Ui.text, fontSize = 12.sp
                                         )
                                         Slider(
@@ -1997,7 +2007,7 @@ fun EditorScreen(
                                             valueRange = -30f..30f
                                         )
                                         Text(
-                                            "Rotacion ${perspRoll.toInt()} grados",
+                                            stringResource(R.string.rotation_degrees, perspRoll.toInt()),
                                             color = Ui.text, fontSize = 12.sp
                                         )
                                         Slider(
@@ -2017,7 +2027,7 @@ fun EditorScreen(
                                         perspCorners = app.revela.core.PerspectiveCorners.IDENTITY
                                         perspYaw = 0f; perspPitch = 0f; perspRoll = 0f
                                         workingEdit = Edit.Perspective(perspCorners, perspMode)
-                                    }) { Text("Restablecer") }
+                                    }) { Text(stringResource(R.string.reset)) }
                                 }
 
                                 EditorTool.EXPAND -> Column(
@@ -2027,7 +2037,7 @@ fun EditorScreen(
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
-                                        "Expandir: arrastra los puntos azules hacia fuera para ampliar el lienzo",
+                                        stringResource(R.string.expand_hint),
                                         color = Ui.text,
                                         fontSize = 13.sp
                                     )
@@ -2038,18 +2048,18 @@ fun EditorScreen(
                                         FilterChip(
                                             selected = !expandMirror,
                                             onClick = { expandMirror = false; workingEdit = Edit.Expand(expandEdges, false) },
-                                            label = { Text("Relleno borde") }
+                                            label = { Text(stringResource(R.string.edge_fill)) }
                                         )
                                         FilterChip(
                                             selected = expandMirror,
                                             onClick = { expandMirror = true; workingEdit = Edit.Expand(expandEdges, true) },
-                                            label = { Text("Relleno espejo") }
+                                            label = { Text(stringResource(R.string.mirror_fill)) }
                                         )
                                     }
                                     OutlinedButton(onClick = {
                                         expandEdges = app.revela.core.ExpandEdges()
                                         workingEdit = Edit.Expand(expandEdges, expandMirror)
-                                    }) { Text("Restablecer") }
+                                    }) { Text(stringResource(R.string.reset)) }
                                 }
 
                                 EditorTool.BRUSH -> Column(
@@ -2059,7 +2069,7 @@ fun EditorScreen(
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
-                                        "Brocha: ${(brushSize * 100).toInt()}%  |  Intensidad: ${(brushAmount * 100).toInt()}%",
+                                        stringResource(R.string.brush_intensity_combo, (brushSize * 100).toInt(), (brushAmount * 100).toInt()),
                                         color = Ui.text,
                                         fontSize = 13.sp
                                     )
@@ -2081,7 +2091,7 @@ fun EditorScreen(
                                             FilterChip(
                                                 selected = brushParam == id,
                                                 onClick = { brushParam = id },
-                                                label = { Text(label) }
+                                                label = { Text(stringResource(label)) }
                                             )
                                         }
                                     }
@@ -2109,11 +2119,11 @@ fun EditorScreen(
                                                 }
                                             },
                                             enabled = strokeX.isNotEmpty()
-                                        ) { Text("Aplicar trazo") }
+                                        ) { Text(stringResource(R.string.apply_stroke)) }
                                         OutlinedButton(onClick = {
                                             strokeX.clear()
                                             strokeY.clear()
-                                        }) { Text("Descartar") }
+                                        }) { Text(stringResource(R.string.discard)) }
                                     }
                                 }
 
@@ -2125,16 +2135,16 @@ fun EditorScreen(
                                 ) {
                                     Text(
                                         when (hpStep) {
-                                            0 -> "Paso 1: toca el ojo izquierdo"
-                                            1 -> "Paso 2: toca el ojo derecho"
-                                            2 -> "Paso 3: toca la boca"
-                                            else -> "Ajusta el giro o arrastra los puntos azules"
+                                            0 -> stringResource(R.string.head_pose_step1)
+                                            1 -> stringResource(R.string.head_pose_step2)
+                                            2 -> stringResource(R.string.head_pose_step3)
+                                            else -> stringResource(R.string.head_pose_adjust)
                                         },
                                         color = Ui.text,
                                         fontSize = 13.sp
                                     )
                                     Text(
-                                        "Giro horizontal ${hpYawDeg.toInt()} grados",
+                                        stringResource(R.string.horizontal_rotation_degrees, hpYawDeg.toInt()),
                                         color = Ui.text, fontSize = 12.sp
                                     )
                                     Slider(
@@ -2143,7 +2153,7 @@ fun EditorScreen(
                                         valueRange = -30f..30f
                                     )
                                     Text(
-                                        "Giro vertical ${hpPitchDeg.toInt()} grados",
+                                        stringResource(R.string.vertical_rotation_degrees, hpPitchDeg.toInt()),
                                         color = Ui.text, fontSize = 12.sp
                                     )
                                     Slider(
@@ -2156,7 +2166,7 @@ fun EditorScreen(
                                             hpLeft = null; hpRight = null; hpMouth = null
                                             hpStep = 0
                                             workingEdit = null
-                                        }) { Text("Reiniciar puntos") }
+                                        }) { Text(stringResource(R.string.reset_points)) }
                                     }
                                 }
 
@@ -2211,7 +2221,7 @@ fun EditorScreen(
                                         IconButton(onClick = { runAuto() }, modifier = Modifier.size(44.dp)) {
                                             Icon(
                                                 Icons.Filled.AutoFixHigh,
-                                                contentDescription = "Auto",
+                                                contentDescription = stringResource(R.string.auto),
                                                 tint = Ui.icon
                                             )
                                         }
@@ -2230,9 +2240,9 @@ fun EditorScreen(
                                                 .padding(horizontal = 12.dp, vertical = 2.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text("Auto ajustado", color = Ui.text, fontSize = 13.sp)
+                                            Text(stringResource(R.string.auto_adjusted), color = Ui.text, fontSize = 13.sp)
                                             Spacer(Modifier.weight(1f))
-                                            TextButton(onClick = { undoAuto() }) { Text("Deshacer") }
+                                            TextButton(onClick = { undoAuto() }) { Text(stringResource(R.string.undo)) }
                                         }
                                     }
                                     Row(
@@ -2248,13 +2258,13 @@ fun EditorScreen(
                                                     tuneParam = p
                                                     dragValue = Float.NaN
                                                 },
-                                                label = { Text(p.label, fontSize = 12.sp) },
+                                                label = { Text(stringResource(p.labelRes), fontSize = 12.sp) },
                                                 modifier = Modifier.padding(horizontal = 4.dp)
                                             )
                                         }
                                     }
                                     Text(
-                                        "Arrastra en vertical para elegir parametro - en horizontal para ajustar",
+                                        stringResource(R.string.tune_gesture_hint),
                                         color = Ui.textDim,
                                         fontSize = 11.sp,
                                         textAlign = TextAlign.Center,
@@ -2275,17 +2285,17 @@ fun EditorScreen(
                                         OutlinedButton(onClick = { rotateBy(-1) }) {
                                             Icon(Icons.Filled.RotateLeft, contentDescription = null, tint = Ui.icon)
                                             Spacer(Modifier.width(6.dp))
-                                            Text("90 izq", color = Ui.text)
+                                            Text(stringResource(R.string.rotate_90_left), color = Ui.text)
                                         }
                                         Spacer(Modifier.width(16.dp))
                                         OutlinedButton(onClick = { rotateBy(1) }) {
                                             Icon(Icons.Filled.RotateRight, contentDescription = null, tint = Ui.icon)
                                             Spacer(Modifier.width(6.dp))
-                                            Text("90 der", color = Ui.text)
+                                            Text(stringResource(R.string.rotate_90_right), color = Ui.text)
                                         }
                                     }
                                     Text(
-                                        "Gira el marco en cuartos de vuelta. El enderece fino esta en Recortar.",
+                                        stringResource(R.string.rotate_hint),
                                         color = Ui.textDim,
                                         fontSize = 11.sp,
                                         textAlign = TextAlign.Center,
@@ -2310,11 +2320,11 @@ fun EditorScreen(
                                             horizontalArrangement = Arrangement.Center
                                         ) {
                                             listOf(
-                                                "neutral" to "Neutro",
-                                                "red" to "Rojo",
-                                                "yellow" to "Amarillo",
-                                                "green" to "Verde",
-                                                "blue" to "Azul"
+                                                "neutral" to R.string.neutral,
+                                                "red" to R.string.red,
+                                                "yellow" to R.string.yellow,
+                                                "green" to R.string.green,
+                                                "blue" to R.string.blue
                                             ).forEach { (id, label) ->
                                                 FilterChip(
                                                     selected = current == id,
@@ -2323,7 +2333,7 @@ fun EditorScreen(
                                                         stackVersion++
                                                         persistSession()
                                                     },
-                                                    label = { Text(label, fontSize = 12.sp) },
+                                                    label = { Text(stringResource(label), fontSize = 12.sp) },
                                                     modifier = Modifier.padding(horizontal = 4.dp)
                                                 )
                                             }
@@ -2334,12 +2344,12 @@ fun EditorScreen(
                                                     stackVersion++
                                                     persistSession()
                                                 },
-                                                label = { Text("Color", fontSize = 12.sp) },
+                                                label = { Text(stringResource(R.string.color), fontSize = 12.sp) },
                                                 modifier = Modifier.padding(horizontal = 4.dp)
                                             )
                                         }
                                         Text(
-                                            "Cada filtro pondera los canales al pasar a blanco y negro.",
+                                            stringResource(R.string.bnw_hint),
                                             color = Ui.textDim,
                                             fontSize = 11.sp,
                                             textAlign = TextAlign.Center,
@@ -2354,13 +2364,13 @@ fun EditorScreen(
                                         .background(Ui.panel)
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
-                                    TonalSlider("Sombras", effective().tonalShadows) { v ->
+                                    TonalSlider(stringResource(R.string.shadows), effective().tonalShadows) { v ->
                                         workingAdj = effective().copy(tonalShadows = v)
                                     }
-                                    TonalSlider("Medios", effective().tonalMidtones) { v ->
+                                    TonalSlider(stringResource(R.string.midtones), effective().tonalMidtones) { v ->
                                         workingAdj = effective().copy(tonalMidtones = v)
                                     }
-                                    TonalSlider("Luces", effective().tonalHighlights) { v ->
+                                    TonalSlider(stringResource(R.string.highlights), effective().tonalHighlights) { v ->
                                         workingAdj = effective().copy(tonalHighlights = v)
                                     }
                                     Row(
@@ -2372,12 +2382,12 @@ fun EditorScreen(
                                             stackVersion++
                                             workingAdj = null
                                             persistSession()
-                                        }) { Text("Restablecer", color = Ui.textDim) }
+                                        }) { Text(stringResource(R.string.reset), color = Ui.textDim) }
                                         Spacer(Modifier.width(16.dp))
                                         Button(onClick = {
                                             commitTonal()
                                             activeTool = null
-                                        }) { Text("Aplicar") }
+                                        }) { Text(stringResource(R.string.apply)) }
                                     }
                                 }
 
@@ -2387,10 +2397,10 @@ fun EditorScreen(
                                         .background(Ui.panel)
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
-                                    TonalSlider("Temperatura", effective().temperature) { v ->
+                                    TonalSlider(stringResource(R.string.temperature), effective().temperature) { v ->
                                         workingAdj = effective().copy(temperature = v)
                                     }
-                                    TonalSlider("Tinte", effective().tint) { v ->
+                                    TonalSlider(stringResource(R.string.tint), effective().tint) { v ->
                                         workingAdj = effective().copy(tint = v)
                                     }
                                     Row(
@@ -2402,7 +2412,7 @@ fun EditorScreen(
                                             stackVersion++
                                             workingAdj = null
                                             persistSession()
-                                        }) { Text("Restablecer", color = Ui.textDim) }
+                                        }) { Text(stringResource(R.string.reset), color = Ui.textDim) }
                                         Spacer(Modifier.width(16.dp))
                                         Button(onClick = {
                                             val cur = effective()
@@ -2412,7 +2422,7 @@ fun EditorScreen(
                                             stackVersion++
                                             workingAdj = null
                                             persistSession()
-                                        }) { Text("Aplicar") }
+                                        }) { Text(stringResource(R.string.apply)) }
                                     }
                                 }
 
@@ -2426,18 +2436,18 @@ fun EditorScreen(
                                             .background(Ui.panel)
                                             .padding(horizontal = 16.dp, vertical = 8.dp)
                                     ) {
-                                        TonalSlider("Estructura", cur.structure) { v ->
+                                        TonalSlider(stringResource(R.string.structure), cur.structure) { v ->
                                             workingEdit = cur.copy(structure = v)
                                         }
-                                        TonalSlider("Enfoque", cur.sharpening) { v ->
+                                        TonalSlider(stringResource(R.string.sharpening), cur.sharpening) { v ->
                                             workingEdit = cur.copy(sharpening = v)
                                         }
                                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                            OutlinedButton(onClick = { resetTool(Tool.DETAILS) }) { Text("Restablecer") }
+                                            OutlinedButton(onClick = { resetTool(Tool.DETAILS) }) { Text(stringResource(R.string.reset)) }
                                             Button(onClick = {
                                                 commitWorkingEdit(workingEdit as? Edit.Details ?: cur)
                                                 activeTool = null
-                                            }) { Text("Aplicar") }
+                                            }) { Text(stringResource(R.string.apply)) }
                                         }
                                     }
                                 }
@@ -2446,7 +2456,7 @@ fun EditorScreen(
                                     val cur = (workingEdit as? Edit.Hdr)?.strength
                                         ?: stack.edits.filterIsInstance<Edit.Hdr>().firstOrNull()?.strength ?: 0f
                                     StrengthPanel(
-                                        label = "Intensidad",
+                                        label = stringResource(R.string.intensity),
                                         value = cur,
                                         onValueChange = { workingEdit = Edit.Hdr(it) },
                                         onReset = { resetTool(Tool.HDR) },
@@ -2458,7 +2468,7 @@ fun EditorScreen(
                                     val cur = (workingEdit as? Edit.Grain)?.strength
                                         ?: stack.edits.filterIsInstance<Edit.Grain>().firstOrNull()?.strength ?: 0f
                                     StrengthPanel(
-                                        label = "Intensidad",
+                                        label = stringResource(R.string.intensity),
                                         value = cur,
                                         onValueChange = { workingEdit = Edit.Grain(it) },
                                         onReset = { resetTool(Tool.GRAIN) },
@@ -2470,7 +2480,7 @@ fun EditorScreen(
                                     val cur = (workingEdit as? Edit.Glow)?.strength
                                         ?: stack.edits.filterIsInstance<Edit.Glow>().firstOrNull()?.strength ?: 0f
                                     StrengthPanel(
-                                        label = "Intensidad",
+                                        label = stringResource(R.string.intensity),
                                         value = cur,
                                         onValueChange = { workingEdit = Edit.Glow(it) },
                                         onReset = { resetTool(Tool.GLOW) },
@@ -2482,7 +2492,7 @@ fun EditorScreen(
                                     val cur = (workingEdit as? Edit.LensBlur)?.strength
                                         ?: stack.edits.filterIsInstance<Edit.LensBlur>().firstOrNull()?.strength ?: 0f
                                     StrengthPanel(
-                                        label = "Intensidad",
+                                        label = stringResource(R.string.intensity),
                                         value = cur,
                                         onValueChange = { workingEdit = Edit.LensBlur(it) },
                                         onReset = { resetTool(Tool.LENS_BLUR) },
@@ -2496,7 +2506,7 @@ fun EditorScreen(
                                     if (kind != null) {
                                         val current = if (workingPresetIntensity.isNaN()) 0f else workingPresetIntensity
                                         StrengthPanel(
-                                            label = kind.label,
+                                            label = stringResource(kind.labelRes),
                                             value = current,
                                             onValueChange = { workingPresetIntensity = it },
                                             onReset = {
@@ -2534,19 +2544,19 @@ fun EditorScreen(
                                             horizontalArrangement = Arrangement.Center
                                         ) {
                                             listOf(
-                                                "normal" to "Normal",
-                                                "add" to "Suma",
-                                                "overlay" to "Superponer",
-                                                "subtract" to "Resta",
-                                                "screen" to "Pantalla",
-                                                "multiply" to "Multiplicar",
-                                                "lighten" to "Aclarar",
-                                                "darken" to "Oscurecer"
+                                                "normal" to R.string.blend_normal,
+                                                "add" to R.string.blend_add,
+                                                "overlay" to R.string.blend_overlay,
+                                                "subtract" to R.string.blend_subtract,
+                                                "screen" to R.string.blend_screen,
+                                                "multiply" to R.string.blend_multiply,
+                                                "lighten" to R.string.blend_lighten,
+                                                "darken" to R.string.blend_darken
                                             ).forEach { (id, label) ->
                                                 FilterChip(
                                                     selected = cur.blend == id,
                                                     onClick = { workingEdit = cur.copy(blend = id) },
-                                                    label = { Text(label, fontSize = 12.sp) },
+                                                    label = { Text(stringResource(label), fontSize = 12.sp) },
                                                     modifier = Modifier.padding(horizontal = 4.dp)
                                                 )
                                             }
@@ -2558,22 +2568,22 @@ fun EditorScreen(
                                                         ActivityResultContracts.PickVisualMedia.ImageOnly
                                                     )
                                                 )
-                                            }) { Text("2a foto") }
+                                            }) { Text(stringResource(R.string.second_photo)) }
                                             Spacer(Modifier.width(8.dp))
                                             Text(
-                                                if (overlayImage != null) "Cargada" else "Sin imagen",
+                                                if (overlayImage != null) stringResource(R.string.loaded) else stringResource(R.string.no_image),
                                                 color = Ui.textDim,
                                                 fontSize = 12.sp
                                             )
                                         }
-                                        Text("Opacidad: ${(cur.opacity * 100).toInt()}%", color = Ui.text, fontSize = 13.sp)
+                                        Text(stringResource(R.string.opacity_percent, (cur.opacity * 100).toInt()), color = Ui.text, fontSize = 13.sp)
                                         Slider(
                                             value = cur.opacity,
                                             onValueChange = { workingEdit = cur.copy(opacity = it) },
                                             valueRange = 0f..1f
                                         )
                                         Text(
-                                            "Escala capa: ${(cur.scale * 100).toInt()}%  |  Rotacion: ${cur.rotationDeg.toInt()} grados",
+                                            stringResource(R.string.scale_rotation_combo, (cur.scale * 100).toInt(), cur.rotationDeg.toInt()),
                                             color = Ui.text, fontSize = 13.sp
                                         )
                                         Slider(
@@ -2587,18 +2597,18 @@ fun EditorScreen(
                                             valueRange = -45f..45f
                                         )
                                         Text(
-                                            "Arrastra la foto para mover la 2a capa",
+                                            stringResource(R.string.double_expo_hint),
                                             color = Ui.textDim, fontSize = 12.sp
                                         )
                                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                             OutlinedButton(onClick = {
                                                 resetTool(Tool.DOUBLE_EXPO)
                                                 overlayImage = null
-                                            }) { Text("Restablecer") }
+                                            }) { Text(stringResource(R.string.reset)) }
                                             Button(onClick = {
                                                 commitWorkingEdit(workingEdit as? Edit.DoubleExpo ?: cur)
                                                 activeTool = null
-                                            }) { Text("Aplicar") }
+                                            }) { Text(stringResource(R.string.apply)) }
                                         }
                                     }
                                 }
@@ -2616,7 +2626,7 @@ fun EditorScreen(
                                         OutlinedTextField(
                                             value = cur.content,
                                             onValueChange = { workingEdit = cur.copy(content = it) },
-                                            label = { Text("Texto") },
+                                            label = { Text(stringResource(R.string.tool_text)) },
                                             singleLine = true,
                                             modifier = Modifier.fillMaxWidth()
                                         )
@@ -2630,12 +2640,12 @@ fun EditorScreen(
                                                 FilterChip(
                                                     selected = cur.colorInt == colorInt,
                                                     onClick = { workingEdit = cur.copy(colorInt = colorInt) },
-                                                    label = { Text(label, fontSize = 12.sp) },
+                                                    label = { Text(stringResource(label), fontSize = 12.sp) },
                                                     modifier = Modifier.padding(horizontal = 4.dp)
                                                 )
                                             }
                                         }
-                                        Text("Tamano: ${(cur.sizePct * 100).toInt()}%", color = Ui.text, fontSize = 13.sp)
+                                        Text(stringResource(R.string.size_percent, (cur.sizePct * 100).toInt()), color = Ui.text, fontSize = 13.sp)
                                         Slider(
                                             value = cur.sizePct,
                                             onValueChange = { workingEdit = cur.copy(sizePct = it) },
@@ -2647,22 +2657,22 @@ fun EditorScreen(
                                                 .horizontalScroll(rememberScrollState()),
                                             horizontalArrangement = Arrangement.Center
                                         ) {
-                                            listOf("top" to "Arriba", "center" to "Centro", "bottom" to "Abajo")
+                                            listOf("top" to R.string.top, "center" to R.string.center, "bottom" to R.string.bottom)
                                                 .forEach { (id, label) ->
                                                     FilterChip(
                                                         selected = cur.gravity == id,
                                                         onClick = { workingEdit = cur.copy(gravity = id) },
-                                                        label = { Text(label, fontSize = 12.sp) },
+                                                        label = { Text(stringResource(label), fontSize = 12.sp) },
                                                         modifier = Modifier.padding(horizontal = 4.dp)
                                                     )
                                                 }
                                         }
                                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                            OutlinedButton(onClick = { resetTool(Tool.TEXT) }) { Text("Restablecer") }
+                                            OutlinedButton(onClick = { resetTool(Tool.TEXT) }) { Text(stringResource(R.string.reset)) }
                                             Button(onClick = {
                                                 commitWorkingEdit(workingEdit as? Edit.TextOverlay ?: cur)
                                                 activeTool = null
-                                            }) { Text("Aplicar") }
+                                            }) { Text(stringResource(R.string.apply)) }
                                         }
                                     }
                                 }
@@ -2687,23 +2697,23 @@ fun EditorScreen(
                                                 FilterChip(
                                                     selected = cur.colorInt == colorInt,
                                                     onClick = { workingEdit = cur.copy(colorInt = colorInt) },
-                                                    label = { Text(label, fontSize = 12.sp) },
+                                                    label = { Text(stringResource(label), fontSize = 12.sp) },
                                                     modifier = Modifier.padding(horizontal = 4.dp)
                                                 )
                                             }
                                         }
-                                        Text("Grosor: ${(cur.widthPct * 100).toInt()}%", color = Ui.text, fontSize = 13.sp)
+                                        Text(stringResource(R.string.thickness_percent, (cur.widthPct * 100).toInt()), color = Ui.text, fontSize = 13.sp)
                                         Slider(
                                             value = cur.widthPct,
                                             onValueChange = { workingEdit = cur.copy(widthPct = it) },
                                             valueRange = 0.01f..0.25f
                                         )
                                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                            OutlinedButton(onClick = { resetTool(Tool.FRAME) }) { Text("Restablecer") }
+                                            OutlinedButton(onClick = { resetTool(Tool.FRAME) }) { Text(stringResource(R.string.reset)) }
                                             Button(onClick = {
                                                 commitWorkingEdit(workingEdit as? Edit.Frame ?: cur)
                                                 activeTool = null
-                                            }) { Text("Aplicar") }
+                                            }) { Text(stringResource(R.string.apply)) }
                                         }
                                     }
                                 }
@@ -2757,7 +2767,7 @@ fun EditorScreen(
                 }
             )
         }
-        if (activeTool == null && base != null) {
+        if (activeTool == null && base != null && bottomTab != BottomTab.TOOLS) {
             FavoritesBar(
                 favorites = favorites,
                 onSelect = {
@@ -2788,8 +2798,8 @@ fun EditorScreen(
     if (showRevertConfirm) {
         AlertDialog(
             onDismissRequest = { showRevertConfirm = false },
-            title = { Text("Revertir todo") },
-            text = { Text("Se eliminaran todas las ediciones de esta foto.") },
+            title = { Text(stringResource(R.string.revert_all)) },
+            text = { Text(stringResource(R.string.revert_all_message)) },
             confirmButton = {
                 Button(onClick = {
                     stack = EditStack()
@@ -2797,10 +2807,10 @@ fun EditorScreen(
                     stackVersion++
                     persistSession()
                     showRevertConfirm = false
-                }) { Text("Revertir") }
+                }) { Text(stringResource(R.string.revert)) }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showRevertConfirm = false }) { Text("Cancelar") }
+                OutlinedButton(onClick = { showRevertConfirm = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -2808,15 +2818,15 @@ fun EditorScreen(
     if (showStyleNameDialog) {
         AlertDialog(
             onDismissRequest = { showStyleNameDialog = false },
-            title = { Text("Guardar estilo") },
+            title = { Text(stringResource(R.string.save_style)) },
             text = {
                 Column {
-                    Text("Guarda los ajustes actuales como estilo reutilizable.")
+                    Text(stringResource(R.string.save_style_message))
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = styleName,
                         onValueChange = { styleName = it },
-                        label = { Text("Nombre") },
+                        label = { Text(stringResource(R.string.name)) },
                         singleLine = true
                     )
                 }
@@ -2838,21 +2848,21 @@ fun EditorScreen(
                         showStyleNameDialog = false
                     },
                     enabled = styleName.isNotBlank()
-                ) { Text("Guardar") }
+                ) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showStyleNameDialog = false }) { Text("Cancelar") }
+                OutlinedButton(onClick = { showStyleNameDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
 
     // Detalles de la imagen: dimensiones + EXIF basico de la foto original
     if (showImageDetails) {
-        var details by remember { mutableStateOf("Leyendo...") }
+        var details by remember { mutableStateOf(context.getString(R.string.reading)) }
         LaunchedEffect(sourceUri) {
             val u = sourceUri
             details = if (u == null) {
-                "No hay imagen abierta."
+                context.getString(R.string.no_image_open)
             } else {
                 withContext(Dispatchers.IO) {
                     runCatching {
@@ -2861,32 +2871,32 @@ fun EditorScreen(
                         val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
                         resolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
                         if (bounds.outWidth > 0) {
-                            sb.append("Dimensiones: ${bounds.outWidth} x ${bounds.outHeight}\n")
+                            sb.append(context.getString(R.string.dimensions, bounds.outWidth, bounds.outHeight))
                         }
                         resolver.openInputStream(u)?.use { input ->
                             val exif = androidx.exifinterface.media.ExifInterface(input)
                             fun tag(label: String, t: String) {
                                 exif.getAttribute(t)?.let { sb.append("$label: $it\n") }
                             }
-                            tag("Fecha de captura", androidx.exifinterface.media.ExifInterface.TAG_DATETIME_ORIGINAL)
-                            tag("Camara", androidx.exifinterface.media.ExifInterface.TAG_MAKE)
-                            tag("Modelo", androidx.exifinterface.media.ExifInterface.TAG_MODEL)
-                            tag("Apertura", androidx.exifinterface.media.ExifInterface.TAG_F_NUMBER)
-                            tag("Exposicion", androidx.exifinterface.media.ExifInterface.TAG_EXPOSURE_TIME)
-                            tag("ISO", androidx.exifinterface.media.ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)
-                            tag("Focal", androidx.exifinterface.media.ExifInterface.TAG_FOCAL_LENGTH)
+                            tag(context.getString(R.string.exif_capture_date), androidx.exifinterface.media.ExifInterface.TAG_DATETIME_ORIGINAL)
+                            tag(context.getString(R.string.exif_camera), androidx.exifinterface.media.ExifInterface.TAG_MAKE)
+                            tag(context.getString(R.string.exif_model), androidx.exifinterface.media.ExifInterface.TAG_MODEL)
+                            tag(context.getString(R.string.exif_aperture), androidx.exifinterface.media.ExifInterface.TAG_F_NUMBER)
+                            tag(context.getString(R.string.exif_exposure), androidx.exifinterface.media.ExifInterface.TAG_EXPOSURE_TIME)
+                            tag(context.getString(R.string.exif_iso), androidx.exifinterface.media.ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)
+                            tag(context.getString(R.string.exif_focal), androidx.exifinterface.media.ExifInterface.TAG_FOCAL_LENGTH)
                         }
-                        if (sb.isEmpty()) "Sin metadatos disponibles." else sb.toString().trim()
-                    }.getOrDefault("No se pudieron leer los metadatos.")
+                        if (sb.isEmpty()) context.getString(R.string.no_metadata) else sb.toString().trim()
+                    }.getOrDefault(context.getString(R.string.metadata_error))
                 }
             }
         }
         AlertDialog(
             onDismissRequest = { showImageDetails = false },
-            title = { Text("Detalles de la imagen") },
+            title = { Text(stringResource(R.string.image_details)) },
             text = { Text(details) },
             confirmButton = {
-                TextButton(onClick = { showImageDetails = false }) { Text("Cerrar") }
+                TextButton(onClick = { showImageDetails = false }) { Text(stringResource(R.string.close)) }
             }
         )
     }
@@ -2895,18 +2905,19 @@ fun EditorScreen(
     if (showSettings) {
         var cfgPng by remember { mutableStateOf(appSettings.exportPng) }
         var cfgQuality by remember { mutableIntStateOf(appSettings.exportQuality) }
+        var cfgLang by remember { mutableStateOf(appSettings.language) }
         AlertDialog(
             onDismissRequest = { showSettings = false },
-            title = { Text("Configuracion") },
+            title = { Text(stringResource(R.string.settings)) },
             text = {
                 Column {
-                    Text("Exportar por defecto", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text(stringResource(R.string.default_export), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(selected = !cfgPng, onClick = { cfgPng = false }, label = { Text("JPEG") })
                         FilterChip(selected = cfgPng, onClick = { cfgPng = true }, label = { Text("PNG") })
                     }
                     if (!cfgPng) {
-                        Text("Calidad: $cfgQuality", fontSize = 13.sp)
+                        Text(stringResource(R.string.quality, cfgQuality), fontSize = 13.sp)
                         Slider(
                             value = cfgQuality.toFloat(),
                             onValueChange = { cfgQuality = it.toInt() },
@@ -2914,21 +2925,42 @@ fun EditorScreen(
                         )
                     }
                     Text(
-                        "La imagen exportada se guarda en Imagenes/revela.",
+                        stringResource(R.string.export_saved_hint),
                         fontSize = 12.sp,
                         color = Ui.textDim
                     )
+                    Spacer(Modifier.height(12.dp))
+                    Text(stringResource(R.string.language), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = cfgLang == "system",
+                            onClick = { cfgLang = "system" },
+                            label = { Text(stringResource(R.string.system)) }
+                        )
+                        FilterChip(
+                            selected = cfgLang == "es",
+                            onClick = { cfgLang = "es" },
+                            label = { Text(stringResource(R.string.spanish)) }
+                        )
+                        FilterChip(
+                            selected = cfgLang == "en",
+                            onClick = { cfgLang = "en" },
+                            label = { Text(stringResource(R.string.english)) }
+                        )
+                    }
                 }
             },
             confirmButton = {
                 Button(onClick = {
-                    appSettings = app.revela.core.AppSettings(exportPng = cfgPng, exportQuality = cfgQuality)
+                    val langChanged = cfgLang != appSettings.language
+                    appSettings = appSettings.copy(exportPng = cfgPng, exportQuality = cfgQuality, language = cfgLang)
                     app.revela.core.SettingsStore.save(context.filesDir, appSettings)
                     showSettings = false
-                }) { Text("Guardar") }
+                    if (langChanged) (context as? android.app.Activity)?.recreate()
+                }) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showSettings = false }) { Text("Cancelar") }
+                OutlinedButton(onClick = { showSettings = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -2937,7 +2969,7 @@ fun EditorScreen(
     if (showFavEditor) {
         AlertDialog(
             onDismissRequest = { showFavEditor = false },
-            title = { Text("Barra de herramientas") },
+            title = { Text(stringResource(R.string.toolbar)) },
             text = {
                 Column(
                     modifier = Modifier
@@ -2945,12 +2977,13 @@ fun EditorScreen(
                         .padding(vertical = 4.dp)
                 ) {
                     Text(
-                        "Elige las herramientas que ves debajo de la foto.",
+                        stringResource(R.string.favorites_editor_hint),
                         fontSize = 13.sp,
                         color = Ui.textDim
                     )
                     Spacer(Modifier.height(8.dp))
                     toolCatalog().forEach { (tool, icon, label) ->
+                        val labelText = stringResource(label)
                         val fav = tool.id in favorites
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -2960,20 +2993,20 @@ fun EditorScreen(
                                 .padding(vertical = 6.dp)
                         ) {
                             Icon(
-                                icon, label,
+                                icon, labelText,
                                 tint = if (fav) Ui.accent else Ui.line,
                                 modifier = Modifier.size(22.dp)
                             )
                             Spacer(Modifier.width(12.dp))
                             Text(
-                                label,
+                                labelText,
                                 fontSize = 14.sp,
                                 color = if (fav) Ui.text else Ui.textDim,
                                 modifier = Modifier.weight(1f)
                             )
                             Icon(
                                 if (fav) Icons.Filled.CheckBox else Icons.Outlined.CheckBoxOutlineBlank,
-                                contentDescription = if (fav) "Quitar" else "Anadir",
+                                contentDescription = if (fav) stringResource(R.string.remove) else stringResource(R.string.add),
                                 tint = if (fav) Ui.accent else Ui.line,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -2982,7 +3015,7 @@ fun EditorScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showFavEditor = false }) { Text("Listo") }
+                TextButton(onClick = { showFavEditor = false }) { Text(stringResource(R.string.done)) }
             }
         )
     }
@@ -2990,18 +3023,18 @@ fun EditorScreen(
     if (showAbout) {
         AlertDialog(
             onDismissRequest = { showAbout = false },
-            title = { Text("revela") },
+            title = { Text(stringResource(R.string.app_name)) },
             text = {
                 Column {
-                    Text("Editor de fotos offline para Android, con el flujo de edicion inspirado en Snapseed (reimplementacion limpia).", fontSize = 14.sp)
+                    Text(stringResource(R.string.about_description), fontSize = 14.sp)
                     Spacer(Modifier.height(10.dp))
-                    Text("Version ${app.revela.BuildConfig.VERSION_NAME}", fontSize = 13.sp, color = Ui.textDim)
-                    Text("Licencia AGPL-3.0", fontSize = 13.sp, color = Ui.textDim)
+                    Text(stringResource(R.string.version_label, app.revela.BuildConfig.VERSION_NAME), fontSize = 13.sp, color = Ui.textDim)
+                    Text(stringResource(R.string.license_label), fontSize = 13.sp, color = Ui.textDim)
                     Text("github.com/gnacho/revela", fontSize = 13.sp, color = Ui.textDim)
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showAbout = false }) { Text("Cerrar") }
+                TextButton(onClick = { showAbout = false }) { Text(stringResource(R.string.close)) }
             }
         )
     }
@@ -3009,18 +3042,18 @@ fun EditorScreen(
     deleteStyle?.let { cs ->
         AlertDialog(
             onDismissRequest = { deleteStyle = null },
-            title = { Text("Borrar estilo") },
-            text = { Text("Se eliminara el estilo \"${cs.name}\". La foto no se toca.") },
+            title = { Text(stringResource(R.string.delete_style)) },
+            text = { Text(stringResource(R.string.delete_style_message, cs.name)) },
             confirmButton = {
                 Button(onClick = {
                     customStyles = customStyles.filterNot { it.id == cs.id }
                     app.revela.render.CustomStylesStore.save(context, customStyles)
                     if (selectedCustomId == cs.id) selectedCustomId = null
                     deleteStyle = null
-                }) { Text("Borrar") }
+                }) { Text(stringResource(R.string.delete)) }
             },
             dismissButton = {
-                OutlinedButton(onClick = { deleteStyle = null }) { Text("Cancelar") }
+                OutlinedButton(onClick = { deleteStyle = null }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -3041,8 +3074,8 @@ fun EditorScreen(
                     val uri = result.getOrNull()
                     Toast.makeText(
                         context,
-                        if (result.isSuccess) "Guardado en Imagenes/revela"
-                        else "Error al exportar: ${result.exceptionOrNull()?.message}",
+                        if (result.isSuccess) context.getString(R.string.export_saved)
+                        else context.getString(R.string.export_error, result.exceptionOrNull()?.message),
                         Toast.LENGTH_LONG
                     ).show()
                     if (share && uri != null) {
@@ -3053,7 +3086,7 @@ fun EditorScreen(
                                 addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }
                             context.startActivity(
-                                android.content.Intent.createChooser(intent, "Compartir imagen")
+                                android.content.Intent.createChooser(intent, context.getString(R.string.share_image))
                             )
                         }
                     }
@@ -3109,8 +3142,8 @@ fun CurvesPanel(
                 val identity = EffectiveAdjustments.defaultCurvePoints()
                 points = identity
                 onChange(identity)
-            }) { Text("Restablecer") }
-            Button(onClick = { onCommit(points) }) { Text("Aplicar") }
+            }) { Text(stringResource(R.string.reset)) }
+            Button(onClick = { onCommit(points) }) { Text(stringResource(R.string.apply)) }
         }
     }
 }
@@ -3242,12 +3275,12 @@ fun CropPanel(
             FilterChip(
                 selected = !drawMode,
                 onClick = { onDrawModeChange(false) },
-                label = { Text("Ajustar caja", fontSize = 12.sp) }
+                label = { Text(stringResource(R.string.adjust_box), fontSize = 12.sp) }
             )
             FilterChip(
                 selected = drawMode,
                 onClick = { onDrawModeChange(true) },
-                label = { Text("Dibujar seleccion", fontSize = 12.sp) }
+                label = { Text(stringResource(R.string.draw_selection), fontSize = 12.sp) }
             )
         }
         Row(
@@ -3257,7 +3290,7 @@ fun CropPanel(
             horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
         ) {
             listOf(
-                "Libre" to null,
+                stringResource(R.string.free) to null,
                 "1:1" to 1f,
                 "4:3" to 4f / 3f,
                 "3:4" to 3f / 4f,
@@ -3295,7 +3328,7 @@ fun CropPanel(
                         cropLeft = 0f, cropTop = 0f, cropRight = 1f, cropBottom = 1f
                     )
                 )
-            }) { Icon(Icons.Filled.RotateLeft, "Rotar a la izquierda", tint = Ui.icon) }
+            }) { Icon(Icons.Filled.RotateLeft, stringResource(R.string.rotate_left), tint = Ui.icon) }
             IconButton(onClick = {
                 onChange(
                     geometry.copy(
@@ -3304,19 +3337,19 @@ fun CropPanel(
                         cropLeft = 0f, cropTop = 0f, cropRight = 1f, cropBottom = 1f
                     )
                 )
-            }) { Icon(Icons.Filled.RotateRight, "Rotar a la derecha", tint = Ui.icon) }
+            }) { Icon(Icons.Filled.RotateRight, stringResource(R.string.rotate_right), tint = Ui.icon) }
             IconButton(onClick = { onChange(GeometryModel()) }) {
-                Icon(Icons.Filled.RestartAlt, "Restablecer geometria", tint = Ui.icon)
+                Icon(Icons.Filled.RestartAlt, stringResource(R.string.reset_geometry), tint = Ui.icon)
             }
-            Button(onClick = onCommit) { Text("OK") }
+            Button(onClick = onCommit) { Text(stringResource(R.string.ok)) }
             Spacer(Modifier.width(6.dp))
-            OutlinedButton(onClick = onCancel) { Text("Cancelar") }
+            OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Enderezar", color = Ui.text, fontSize = 13.sp)
+            Text(stringResource(R.string.straighten), color = Ui.text, fontSize = 13.sp)
             Slider(
                 value = geometry.straightenDeg,
                 onValueChange = { onChange(geometry.copy(straightenDeg = it)) },
@@ -3578,7 +3611,7 @@ fun ExportDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Exportar imagen") },
+        title = { Text(stringResource(R.string.export_image)) },
         text = {
             Column {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -3586,7 +3619,7 @@ fun ExportDialog(
                     FilterChip(selected = png, onClick = { png = true }, label = { Text("PNG") })
                 }
                 if (!png) {
-                    Text("Calidad: $quality", fontSize = 13.sp)
+                    Text(stringResource(R.string.quality, quality), fontSize = 13.sp)
                     Slider(
                         value = quality.toFloat(),
                         onValueChange = { quality = it.toInt() },
@@ -3595,10 +3628,10 @@ fun ExportDialog(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = share, onCheckedChange = { share = it })
-                    Text("Compartir tras exportar", fontSize = 13.sp)
+                    Text(stringResource(R.string.share_after_export), fontSize = 13.sp)
                 }
                 Text(
-                    "Se guarda en Imagenes/revela (max 4096 px de lado).",
+                    stringResource(R.string.export_save_hint),
                     fontSize = 12.sp,
                     color = Ui.textDim
                 )
@@ -3606,45 +3639,45 @@ fun ExportDialog(
         },
         confirmButton = {
             Button(onClick = { onExport(ExportOptions(png = png, quality = quality), share) }) {
-                Text("Exportar")
+                Text(stringResource(R.string.export))
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) { Text("Cancelar") }
+            OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
 
 /** Catalogo completo de herramientas (28, orden Snapseed) compartido por rejilla y barra de favoritos. Iconos outline estilo Snapseed. */
-fun toolCatalog(): List<Triple<EditorTool, androidx.compose.ui.graphics.vector.ImageVector, String>> = listOf(
-    Triple(EditorTool.TUNE, Icons.Outlined.Tune, "Ajustar imagen"),
-    Triple(EditorTool.DETAILS, Icons.Outlined.Details, "Detalles"),
-    Triple(EditorTool.CURVES, Icons.Outlined.ShowChart, "Curvas"),
-    Triple(EditorTool.WB, Icons.Outlined.WbSunny, "Balance blancos"),
-    Triple(EditorTool.CROP, Icons.Outlined.Crop, "Recortar"),
-    Triple(EditorTool.ROTATE, Icons.Outlined.RotateRight, "Girar"),
-    Triple(EditorTool.PERSPECTIVE, Icons.Outlined.Transform, "Perspectiva"),
-    Triple(EditorTool.EXPAND, Icons.Outlined.AspectRatio, "Expandir"),
-    Triple(EditorTool.SELECTIVE, Icons.Outlined.CenterFocusStrong, "Selectivo"),
-    Triple(EditorTool.BRUSH, Icons.Outlined.Brush, "Pincel"),
-    Triple(EditorTool.HEAL, Icons.Outlined.Healing, "Corrector"),
-    Triple(EditorTool.HDR, Icons.Outlined.HdrStrong, "HDR-scape"),
-    Triple(EditorTool.GLOW, Icons.Outlined.AutoAwesome, "Brillo glamuroso"),
-    Triple(EditorTool.TONE, Icons.Outlined.Tonality, "Contraste tonal"),
-    Triple(EditorTool.DRAMA, Icons.Outlined.Bolt, "Drama"),
-    Triple(EditorTool.VINTAGE, Icons.Outlined.PhotoCamera, "Vintage"),
-    Triple(EditorTool.GRAINY_FILM, Icons.Outlined.Movie, "Pelicula granulada"),
-    Triple(EditorTool.RETROLUX, Icons.Outlined.Flare, "Retrolux"),
-    Triple(EditorTool.GRUNGE, Icons.Outlined.Texture, "Grunge"),
-    Triple(EditorTool.BNW, Icons.Outlined.FilterBAndW, "B/N"),
-    Triple(EditorTool.NOIR, Icons.Outlined.Contrast, "Noir"),
-    Triple(EditorTool.PORTRAIT, Icons.Outlined.Face, "Retrato"),
-    Triple(EditorTool.HEAD_POSE, Icons.Outlined.FaceRetouchingNatural, "Pose"),
-    Triple(EditorTool.LENS_BLUR, Icons.Outlined.BlurOn, "Desenfoque"),
-    Triple(EditorTool.VIGNETTE, Icons.Outlined.Vignette, "Vineta"),
-    Triple(EditorTool.DOUBLE_EXPO, Icons.Outlined.Layers, "Doble exposicion"),
-    Triple(EditorTool.TEXT, Icons.Outlined.TextFields, "Texto"),
-    Triple(EditorTool.FRAME, Icons.Outlined.CropFree, "Marcos")
+fun toolCatalog(): List<Triple<EditorTool, androidx.compose.ui.graphics.vector.ImageVector, Int>> = listOf(
+    Triple(EditorTool.TUNE, Icons.Outlined.Tune, R.string.tool_tune),
+    Triple(EditorTool.DETAILS, Icons.Outlined.Details, R.string.tool_details),
+    Triple(EditorTool.CURVES, Icons.Outlined.ShowChart, R.string.tool_curves),
+    Triple(EditorTool.WB, Icons.Outlined.WbSunny, R.string.tool_white_balance),
+    Triple(EditorTool.CROP, Icons.Outlined.Crop, R.string.tool_crop),
+    Triple(EditorTool.ROTATE, Icons.Outlined.RotateRight, R.string.tool_rotate),
+    Triple(EditorTool.PERSPECTIVE, Icons.Outlined.Transform, R.string.tool_perspective),
+    Triple(EditorTool.EXPAND, Icons.Outlined.AspectRatio, R.string.tool_expand),
+    Triple(EditorTool.SELECTIVE, Icons.Outlined.CenterFocusStrong, R.string.tool_selective),
+    Triple(EditorTool.BRUSH, Icons.Outlined.Brush, R.string.tool_brush),
+    Triple(EditorTool.HEAL, Icons.Outlined.Healing, R.string.tool_heal),
+    Triple(EditorTool.HDR, Icons.Outlined.HdrStrong, R.string.tool_hdr),
+    Triple(EditorTool.GLOW, Icons.Outlined.AutoAwesome, R.string.tool_glow),
+    Triple(EditorTool.TONE, Icons.Outlined.Tonality, R.string.tool_tone),
+    Triple(EditorTool.DRAMA, Icons.Outlined.Bolt, R.string.tool_drama),
+    Triple(EditorTool.VINTAGE, Icons.Outlined.PhotoCamera, R.string.tool_vintage),
+    Triple(EditorTool.GRAINY_FILM, Icons.Outlined.Movie, R.string.tool_grainy_film),
+    Triple(EditorTool.RETROLUX, Icons.Outlined.Flare, R.string.tool_retrolux),
+    Triple(EditorTool.GRUNGE, Icons.Outlined.Texture, R.string.tool_grunge),
+    Triple(EditorTool.BNW, Icons.Outlined.FilterBAndW, R.string.tool_bnw),
+    Triple(EditorTool.NOIR, Icons.Outlined.Contrast, R.string.tool_noir),
+    Triple(EditorTool.PORTRAIT, Icons.Outlined.Face, R.string.tool_portrait),
+    Triple(EditorTool.HEAD_POSE, Icons.Outlined.FaceRetouchingNatural, R.string.tool_head_pose),
+    Triple(EditorTool.LENS_BLUR, Icons.Outlined.BlurOn, R.string.tool_lens_blur),
+    Triple(EditorTool.VIGNETTE, Icons.Outlined.Vignette, R.string.tool_vignette),
+    Triple(EditorTool.DOUBLE_EXPO, Icons.Outlined.Layers, R.string.tool_double_expo),
+    Triple(EditorTool.TEXT, Icons.Outlined.TextFields, R.string.tool_text),
+    Triple(EditorTool.FRAME, Icons.Outlined.CropFree, R.string.tool_frame)
 )
 
 /** Barra de favoritos personalizable: iconos de las herramientas elegidas + acceso al editor de la barra. */
@@ -3667,11 +3700,11 @@ fun FavoritesBar(
         favorites.forEach { id ->
             val item = catalog.find { it.first.id == id } ?: return@forEach
             IconButton(onClick = { onSelect(item.first) }, modifier = Modifier.size(50.dp)) {
-                Icon(item.second, item.third, tint = Ui.icon, modifier = Modifier.size(38.dp))
+                Icon(item.second, stringResource(item.third), tint = Ui.icon, modifier = Modifier.size(38.dp))
             }
         }
         IconButton(onClick = onEdit, modifier = Modifier.size(50.dp)) {
-            Icon(Icons.Outlined.Edit, "Personalizar barra de herramientas", tint = Ui.textDim, modifier = Modifier.size(34.dp))
+            Icon(Icons.Outlined.Edit, stringResource(R.string.customize_toolbar), tint = Ui.textDim, modifier = Modifier.size(34.dp))
         }
     }
 }
@@ -3714,12 +3747,12 @@ fun ToolsGrid(
                                     .padding(vertical = 8.dp)
                             ) {
                                 Icon(
-                                    icon, label,
+                                    icon, stringResource(label),
                                     tint = Ui.icon,
                                     modifier = Modifier.size(26.dp)
                                 )
                                 Text(
-                                    label,
+                                    stringResource(label),
                                     color = Ui.textDim,
                                     fontSize = 10.sp,
                                     lineHeight = 12.sp,
@@ -3735,7 +3768,7 @@ fun ToolsGrid(
                             ) {
                                 Icon(
                                     if (fav) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                                    contentDescription = if (fav) "Quitar de favoritos" else "Anadir a favoritos",
+                                    contentDescription = if (fav) stringResource(R.string.remove_from_favorites) else stringResource(R.string.add_to_favorites),
                                     tint = if (fav) Ui.accent else Ui.line,
                                     modifier = Modifier.size(14.dp)
                                 )
@@ -3799,7 +3832,7 @@ fun LooksCarousel(
                 if (th != null) {
                     Image(
                         bitmap = th,
-                        contentDescription = look.label,
+                        contentDescription = stringResource(look.labelRes),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(64.dp)
@@ -3822,7 +3855,7 @@ fun LooksCarousel(
                     )
                 }
                 Text(
-                    look.label,
+                    stringResource(look.labelRes),
                     color = if (sel) Ui.text else Ui.textDim,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(top = 4.dp)
@@ -3917,7 +3950,7 @@ fun LooksCarousel(
                 Text("+", color = Ui.text, fontSize = 26.sp)
             }
             Text(
-                "Guardar",
+                stringResource(R.string.save),
                 color = Ui.textDim,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(top = 4.dp)
@@ -3968,10 +4001,10 @@ fun TonalSlider(label: String, value: Float, onChange: (Float) -> Unit) {
 
 /** Colores disponibles para Texto y Marcos (ARGB como Long). */
 private val textColorChips = listOf(
-    "Blanco" to 0xFFFFFFFFL,
-    "Negro" to 0xFF000000L,
-    "Rojo" to 0xFFFF0000L,
-    "Amarillo" to 0xFFFFFF00L
+    R.string.white to 0xFFFFFFFFL,
+    R.string.black to 0xFF000000L,
+    R.string.red to 0xFFFF0000L,
+    R.string.yellow to 0xFFFFFF00L
 )
 
 /** Panel de intensidad 0..1 generico (HDR, grano, brillo, desenfoque y presets). */
@@ -3996,8 +4029,8 @@ fun StrengthPanel(
             valueRange = 0f..1f
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onReset) { Text("Restablecer") }
-            Button(onClick = onApply) { Text("Aplicar") }
+            OutlinedButton(onClick = onReset) { Text(stringResource(R.string.reset)) }
+            Button(onClick = onApply) { Text(stringResource(R.string.apply)) }
         }
     }
 }

@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App identity -->
+    <string name="app_name">revela</string>
+
+    <!-- Bottom tabs -->
+    <string name="tab_looks">ESTILOS</string>
+    <string name="tab_tools">HERRAMIENTAS</string>
+    <string name="tab_export">EXPORTAR</string>
+
+    <!-- Top bar / menu -->
+    <string name="back_to_library">Biblioteca</string>
+    <string name="open">ABRIR</string>
+    <string name="undo">Deshacer</string>
+    <string name="redo">Rehacer</string>
+    <string name="compare_original">Comparar con el original</string>
+    <string name="menu">Menú</string>
+    <string name="close_tool">Cerrar herramienta</string>
+    <string name="done">Listo</string>
+    <string name="image_details">Detalles de la imagen</string>
+    <string name="revert_all">Revertir todo</string>
+    <string name="settings">Configuración</string>
+    <string name="about">Acerca de</string>
+    <string name="open_photo">Abrir foto</string>
+
+    <!-- Common buttons -->
+    <string name="apply">Aplicar</string>
+    <string name="reset">Restablecer</string>
+    <string name="cancel">Cancelar</string>
+    <string name="save">Guardar</string>
+    <string name="delete">Borrar</string>
+    <string name="close">Cerrar</string>
+    <string name="remove">Quitar</string>
+    <string name="add">Añadir</string>
+    <string name="ok">OK</string>
+
+    <!-- Tool labels (tools grid / favorites bar) -->
+    <string name="tool_tune">Ajustar imagen</string>
+    <string name="tool_details">Detalles</string>
+    <string name="tool_curves">Curvas</string>
+    <string name="tool_white_balance">Balance blancos</string>
+    <string name="tool_crop">Recortar</string>
+    <string name="tool_rotate">Girar</string>
+    <string name="tool_perspective">Perspectiva</string>
+    <string name="tool_expand">Expandir</string>
+    <string name="tool_selective">Selectivo</string>
+    <string name="tool_brush">Pincel</string>
+    <string name="tool_heal">Corrector</string>
+    <string name="tool_hdr">HDR-scape</string>
+    <string name="tool_glow">Brillo glamuroso</string>
+    <string name="tool_tone">Contraste tonal</string>
+    <string name="tool_drama">Drama</string>
+    <string name="tool_vintage">Vintage</string>
+    <string name="tool_grainy_film">Película granulada</string>
+    <string name="tool_retrolux">Retrolux</string>
+    <string name="tool_grunge">Grunge</string>
+    <string name="tool_bnw">B/N</string>
+    <string name="tool_noir">Noir</string>
+    <string name="tool_portrait">Retrato</string>
+    <string name="tool_head_pose">Pose</string>
+    <string name="tool_lens_blur">Desenfoque</string>
+    <string name="tool_vignette">Viñeta</string>
+    <string name="tool_double_expo">Doble exposición</string>
+    <string name="tool_text">Texto</string>
+    <string name="tool_frame">Marcos</string>
+
+    <!-- Looks carousel -->
+    <string name="look_none">Ninguno</string>
+    <string name="look_warm">Cálido</string>
+    <string name="look_cool">Frío</string>
+    <string name="look_vibrant">Vibrante</string>
+    <string name="look_soft">Suave</string>
+    <string name="look_film">Película</string>
+
+    <!-- Adjust / selective / brush parameters -->
+    <string name="exposure">Exposición</string>
+    <string name="contrast">Contraste</string>
+    <string name="saturation">Saturación</string>
+    <string name="temperature">Temperatura</string>
+    <string name="tint">Tinte</string>
+    <string name="brightness">Brillo</string>
+    <string name="dodge_burn">Claro/Oscuro</string>
+
+    <!-- Tonal / details sliders -->
+    <string name="shadows">Sombras</string>
+    <string name="midtones">Medios</string>
+    <string name="highlights">Luces</string>
+    <string name="structure">Estructura</string>
+    <string name="sharpening">Enfoque</string>
+    <string name="intensity">Intensidad</string>
+
+    <!-- Tune -->
+    <string name="auto">Auto</string>
+    <string name="auto_adjusted">Auto ajustado</string>
+    <string name="tune_gesture_hint">Arrastra en vertical para elegir parámetro - en horizontal para ajustar</string>
+
+    <!-- Selective -->
+    <string name="selective_hint">Toca para añadir punto (máx 8) - arrastra el punto para moverlo - pulsación larga para borrar - desliza en horizontal para ajustar</string>
+
+    <!-- Vignette / heal / brush percentages -->
+    <string name="intensity_percent">Intensidad: %1$d%%</string>
+    <string name="brush_size_percent">Brocha: %1$d%%</string>
+    <string name="heal_area">Sanar zona</string>
+    <string name="discard_stroke">Descartar trazo</string>
+
+    <!-- Perspective -->
+    <string name="perspective_hint">Perspectiva: arrastra los puntos azules sobre la foto</string>
+    <string name="free">Libre</string>
+    <string name="scale">Escala</string>
+    <string name="tilt">Inclinar</string>
+    <string name="rotate">Rotar</string>
+    <string name="horizontal_degrees">Horizontal %1$d grados</string>
+    <string name="vertical_degrees">Vertical %1$d grados</string>
+    <string name="rotation_degrees">Rotación %1$d grados</string>
+
+    <!-- Expand -->
+    <string name="expand_hint">Expandir: arrastra los puntos azules hacia fuera para ampliar el lienzo</string>
+    <string name="edge_fill">Relleno borde</string>
+    <string name="mirror_fill">Relleno espejo</string>
+
+    <!-- Brush -->
+    <string name="brush_intensity_combo">Brocha: %1$d%% | Intensidad: %2$d%%</string>
+    <string name="apply_stroke">Aplicar trazo</string>
+    <string name="discard">Descartar</string>
+
+    <!-- Head pose -->
+    <string name="head_pose_step1">Paso 1: toca el ojo izquierdo</string>
+    <string name="head_pose_step2">Paso 2: toca el ojo derecho</string>
+    <string name="head_pose_step3">Paso 3: toca la boca</string>
+    <string name="head_pose_adjust">Ajusta el giro o arrastra los puntos azules</string>
+    <string name="horizontal_rotation_degrees">Giro horizontal %1$d grados</string>
+    <string name="vertical_rotation_degrees">Giro vertical %1$d grados</string>
+    <string name="reset_points">Reiniciar puntos</string>
+
+    <!-- Rotate -->
+    <string name="rotate_90_left">90 izq</string>
+    <string name="rotate_90_right">90 der</string>
+    <string name="rotate_hint">Gira el marco en cuartos de vuelta. El enderezado fino está en Recortar.</string>
+
+    <!-- Black and white -->
+    <string name="neutral">Neutro</string>
+    <string name="red">Rojo</string>
+    <string name="yellow">Amarillo</string>
+    <string name="green">Verde</string>
+    <string name="blue">Azul</string>
+    <string name="color">Color</string>
+    <string name="bnw_hint">Cada filtro pondera los canales al pasar a blanco y negro.</string>
+
+    <!-- Double exposure -->
+    <string name="blend_normal">Normal</string>
+    <string name="blend_add">Suma</string>
+    <string name="blend_overlay">Superponer</string>
+    <string name="blend_subtract">Resta</string>
+    <string name="blend_screen">Pantalla</string>
+    <string name="blend_multiply">Multiplicar</string>
+    <string name="blend_lighten">Aclarar</string>
+    <string name="blend_darken">Oscurecer</string>
+    <string name="second_photo">2ª foto</string>
+    <string name="loaded">Cargada</string>
+    <string name="no_image">Sin imagen</string>
+    <string name="opacity_percent">Opacidad: %1$d%%</string>
+    <string name="scale_rotation_combo">Escala capa: %1$d%% | Rotación: %2$d grados</string>
+    <string name="double_expo_hint">Arrastra la foto para mover la 2ª capa</string>
+
+    <!-- Text tool -->
+    <string name="size_percent">Tamaño: %1$d%%</string>
+    <string name="top">Arriba</string>
+    <string name="center">Centro</string>
+    <string name="bottom">Abajo</string>
+    <string name="white">Blanco</string>
+    <string name="black">Negro</string>
+
+    <!-- Frame tool -->
+    <string name="thickness_percent">Grosor: %1$d%%</string>
+
+    <!-- Crop -->
+    <string name="adjust_box">Ajustar caja</string>
+    <string name="draw_selection">Dibujar selección</string>
+    <string name="rotate_left">Rotar a la izquierda</string>
+    <string name="rotate_right">Rotar a la derecha</string>
+    <string name="reset_geometry">Restablecer geometría</string>
+    <string name="straighten">Enderezar</string>
+
+    <!-- Dialogs -->
+    <string name="revert_all_message">Se eliminarán todas las ediciones de esta foto.</string>
+    <string name="revert">Revertir</string>
+    <string name="save_style">Guardar estilo</string>
+    <string name="save_style_message">Guarda los ajustes actuales como estilo reutilizable.</string>
+    <string name="name">Nombre</string>
+    <string name="reading">Leyendo...</string>
+    <string name="no_image_open">No hay imagen abierta.</string>
+    <string name="dimensions">Dimensiones: %1$d x %2$d\n</string>
+    <string name="exif_capture_date">Fecha de captura</string>
+    <string name="exif_camera">Cámara</string>
+    <string name="exif_model">Modelo</string>
+    <string name="exif_aperture">Apertura</string>
+    <string name="exif_exposure">Exposición</string>
+    <string name="exif_iso">ISO</string>
+    <string name="exif_focal">Focal</string>
+    <string name="no_metadata">Sin metadatos disponibles.</string>
+    <string name="metadata_error">No se pudieron leer los metadatos.</string>
+    <string name="default_export">Exportar por defecto</string>
+    <string name="quality">Calidad: %1$d</string>
+    <string name="export_saved_hint">La imagen exportada se guarda en Imágenes/revela.</string>
+    <string name="language">Idioma</string>
+    <string name="system">Sistema</string>
+    <string name="spanish">Español</string>
+    <string name="english">English</string>
+    <string name="toolbar">Barra de herramientas</string>
+    <string name="favorites_editor_hint">Elige las herramientas que ves debajo de la foto.</string>
+    <string name="about_description">Editor de fotos offline para Android, con el flujo de edición inspirado en Snapseed (reimplementación limpia).</string>
+    <string name="version_label">Versión %1$s</string>
+    <string name="license_label">Licencia AGPL-3.0</string>
+    <string name="delete_style">Borrar estilo</string>
+    <string name="delete_style_message">Se eliminará el estilo "%1$s". La foto no se toca.</string>
+
+    <!-- Export -->
+    <string name="export_saved">Guardado en Imágenes/revela.</string>
+    <string name="export_error">Error al exportar: %1$s</string>
+    <string name="share_image">Compartir imagen</string>
+    <string name="export_image">Exportar imagen</string>
+    <string name="share_after_export">Compartir tras exportar</string>
+    <string name="export_save_hint">Se guarda en Imágenes/revela (máx 4096 px de lado).</string>
+    <string name="export">Exportar</string>
+    <string name="customize_toolbar">Personalizar barra de herramientas</string>
+    <string name="remove_from_favorites">Quitar de favoritos</string>
+    <string name="add_to_favorites">Añadir a favoritos</string>
+
+    <!-- Home -->
+    <string name="sort_recent">Más recientes</string>
+    <string name="sort_oldest">Más antiguas</string>
+    <string name="sort_name_az">Nombre (A-Z)</string>
+    <string name="sort_name_za">Nombre (Z-A)</string>
+    <string name="sort_photos">Ordenar fotos</string>
+    <string name="toggle_view">Cambiar vista</string>
+    <string name="empty_library">Todavía no hay ediciones.\nAbre una foto con el botón +.</string>
+    <string name="delete_session">Eliminar sesión</string>
+    <string name="delete_edit">Eliminar edición</string>
+    <string name="delete_session_message">Se borrarán los ajustes guardados de "%1$s". La foto original no se toca.</string>
+    <string name="relative_now">ahora</string>
+    <string name="relative_minutes">hace %1$d min</string>
+    <string name="relative_hours">hace %1$d h</string>
+    <string name="relative_days">hace %1$d d</string>
+
+    <!-- Welcome wizard -->
+    <string name="welcome_title">Bienvenido a revela</string>
+    <string name="welcome_body1">Edición fotográfica rápida al estilo Snapseed: ajustes reales, sin filtros de broma.</string>
+    <string name="welcome_title2">100% offline</string>
+    <string name="welcome_body2">Sin cuentas y sin nube. Tus fotos nunca salen del dispositivo.</string>
+    <string name="welcome_title3">El gesto clave</string>
+    <string name="welcome_body3">En Ajustar imagen: arrastra en vertical para elegir parámetro y en horizontal para el valor. La varita mejora tu foto al instante.</string>
+    <string name="skip">Saltar</string>
+    <string name="next">Siguiente</string>
+    <string name="start">Empezar</string>
+
+    <!-- Misc -->
+    <string name="cannot_open_photo">No se pudo abrir la foto</string>
+</resources>

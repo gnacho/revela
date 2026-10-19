@@ -1,5 +1,6 @@
 package app.revela.core
 
+import app.revela.R
 import kotlin.math.exp
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -16,10 +17,10 @@ object BrushMath {
     const val DODGE_BURN = "dodgeBurn"
 
     val PARAMS = listOf(
-        EXPOSURE to "Exposicion",
-        SATURATION to "Saturacion",
-        TEMPERATURE to "Temperatura",
-        DODGE_BURN to "Claro/Oscuro"
+        EXPOSURE to R.string.exposure,
+        SATURATION to R.string.saturation,
+        TEMPERATURE to R.string.temperature,
+        DODGE_BURN to R.string.dodge_burn
     )
 
     /** Densidad acumulada de los trazos (1 dentro, 0 fuera, caida gaussiana en el borde). */

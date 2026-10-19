@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App identity -->
+    <string name="app_name">revela</string>
+
+    <!-- Bottom tabs -->
+    <string name="tab_looks">LOOKS</string>
+    <string name="tab_tools">TOOLS</string>
+    <string name="tab_export">EXPORT</string>
+
+    <!-- Top bar / menu -->
+    <string name="back_to_library">Library</string>
+    <string name="open">OPEN</string>
+    <string name="undo">Undo</string>
+    <string name="redo">Redo</string>
+    <string name="compare_original">Compare with original</string>
+    <string name="menu">Menu</string>
+    <string name="close_tool">Close tool</string>
+    <string name="done">Done</string>
+    <string name="image_details">Image details</string>
+    <string name="revert_all">Revert all</string>
+    <string name="settings">Settings</string>
+    <string name="about">About</string>
+    <string name="open_photo">Open photo</string>
+
+    <!-- Common buttons -->
+    <string name="apply">Apply</string>
+    <string name="reset">Reset</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="close">Close</string>
+    <string name="remove">Remove</string>
+    <string name="add">Add</string>
+    <string name="ok">OK</string>
+
+    <!-- Tool labels (tools grid / favorites bar) -->
+    <string name="tool_tune">Tune image</string>
+    <string name="tool_details">Details</string>
+    <string name="tool_curves">Curves</string>
+    <string name="tool_white_balance">White balance</string>
+    <string name="tool_crop">Crop</string>
+    <string name="tool_rotate">Rotate</string>
+    <string name="tool_perspective">Perspective</string>
+    <string name="tool_expand">Expand</string>
+    <string name="tool_selective">Selective</string>
+    <string name="tool_brush">Brush</string>
+    <string name="tool_heal">Healing</string>
+    <string name="tool_hdr">HDR scape</string>
+    <string name="tool_glow">Glamour glow</string>
+    <string name="tool_tone">Tonal contrast</string>
+    <string name="tool_drama">Drama</string>
+    <string name="tool_vintage">Vintage</string>
+    <string name="tool_grainy_film">Grainy film</string>
+    <string name="tool_retrolux">Retrolux</string>
+    <string name="tool_grunge">Grunge</string>
+    <string name="tool_bnw">B&amp;W</string>
+    <string name="tool_noir">Noir</string>
+    <string name="tool_portrait">Portrait</string>
+    <string name="tool_head_pose">Head pose</string>
+    <string name="tool_lens_blur">Lens blur</string>
+    <string name="tool_vignette">Vignette</string>
+    <string name="tool_double_expo">Double exposure</string>
+    <string name="tool_text">Text</string>
+    <string name="tool_frame">Frames</string>
+
+    <!-- Looks carousel -->
+    <string name="look_none">None</string>
+    <string name="look_warm">Warm</string>
+    <string name="look_cool">Cool</string>
+    <string name="look_vibrant">Vibrant</string>
+    <string name="look_soft">Soft</string>
+    <string name="look_film">Film</string>
+
+    <!-- Adjust / selective / brush parameters -->
+    <string name="exposure">Exposure</string>
+    <string name="contrast">Contrast</string>
+    <string name="saturation">Saturation</string>
+    <string name="temperature">Temperature</string>
+    <string name="tint">Tint</string>
+    <string name="brightness">Brightness</string>
+    <string name="dodge_burn">Dodge &amp; burn</string>
+
+    <!-- Tonal / details sliders -->
+    <string name="shadows">Shadows</string>
+    <string name="midtones">Midtones</string>
+    <string name="highlights">Highlights</string>
+    <string name="structure">Structure</string>
+    <string name="sharpening">Sharpening</string>
+    <string name="intensity">Intensity</string>
+
+    <!-- Tune -->
+    <string name="auto">Auto</string>
+    <string name="auto_adjusted">Auto adjusted</string>
+    <string name="tune_gesture_hint">Drag vertically to choose a parameter - horizontally to adjust</string>
+
+    <!-- Selective -->
+    <string name="selective_hint">Tap to add a point (max 8) - drag the point to move it - long press to delete - swipe horizontally to adjust</string>
+
+    <!-- Vignette / heal / brush percentages -->
+    <string name="intensity_percent">Intensity: %1$d%%</string>
+    <string name="brush_size_percent">Brush: %1$d%%</string>
+    <string name="heal_area">Heal area</string>
+    <string name="discard_stroke">Discard stroke</string>
+
+    <!-- Perspective -->
+    <string name="perspective_hint">Perspective: drag the blue points over the photo</string>
+    <string name="free">Free</string>
+    <string name="scale">Scale</string>
+    <string name="tilt">Tilt</string>
+    <string name="rotate">Rotate</string>
+    <string name="horizontal_degrees">Horizontal %1$d degrees</string>
+    <string name="vertical_degrees">Vertical %1$d degrees</string>
+    <string name="rotation_degrees">Rotation %1$d degrees</string>
+
+    <!-- Expand -->
+    <string name="expand_hint">Expand: drag the blue points outward to enlarge the canvas</string>
+    <string name="edge_fill">Edge fill</string>
+    <string name="mirror_fill">Mirror fill</string>
+
+    <!-- Brush -->
+    <string name="brush_intensity_combo">Brush: %1$d%% | Intensity: %2$d%%</string>
+    <string name="apply_stroke">Apply stroke</string>
+    <string name="discard">Discard</string>
+
+    <!-- Head pose -->
+    <string name="head_pose_step1">Step 1: tap the left eye</string>
+    <string name="head_pose_step2">Step 2: tap the right eye</string>
+    <string name="head_pose_step3">Step 3: tap the mouth</string>
+    <string name="head_pose_adjust">Adjust the rotation or drag the blue points</string>
+    <string name="horizontal_rotation_degrees">Horizontal rotation %1$d degrees</string>
+    <string name="vertical_rotation_degrees">Vertical rotation %1$d degrees</string>
+    <string name="reset_points">Reset points</string>
+
+    <!-- Rotate -->
+    <string name="rotate_90_left">90 left</string>
+    <string name="rotate_90_right">90 right</string>
+    <string name="rotate_hint">Rotate the frame in quarter turns. Fine straightening is under Crop.</string>
+
+    <!-- Black and white -->
+    <string name="neutral">Neutral</string>
+    <string name="red">Red</string>
+    <string name="yellow">Yellow</string>
+    <string name="green">Green</string>
+    <string name="blue">Blue</string>
+    <string name="color">Color</string>
+    <string name="bnw_hint">Each filter weights the channels when converting to black and white.</string>
+
+    <!-- Double exposure -->
+    <string name="blend_normal">Normal</string>
+    <string name="blend_add">Add</string>
+    <string name="blend_overlay">Overlay</string>
+    <string name="blend_subtract">Subtract</string>
+    <string name="blend_screen">Screen</string>
+    <string name="blend_multiply">Multiply</string>
+    <string name="blend_lighten">Lighten</string>
+    <string name="blend_darken">Darken</string>
+    <string name="second_photo">2nd photo</string>
+    <string name="loaded">Loaded</string>
+    <string name="no_image">No image</string>
+    <string name="opacity_percent">Opacity: %1$d%%</string>
+    <string name="scale_rotation_combo">Layer scale: %1$d%% | Rotation: %2$d degrees</string>
+    <string name="double_expo_hint">Drag the photo to move the 2nd layer</string>
+
+    <!-- Text tool -->
+    <string name="size_percent">Size: %1$d%%</string>
+    <string name="top">Top</string>
+    <string name="center">Center</string>
+    <string name="bottom">Bottom</string>
+    <string name="white">White</string>
+    <string name="black">Black</string>
+
+    <!-- Frame tool -->
+    <string name="thickness_percent">Thickness: %1$d%%</string>
+
+    <!-- Crop -->
+    <string name="adjust_box">Adjust box</string>
+    <string name="draw_selection">Draw selection</string>
+    <string name="rotate_left">Rotate left</string>
+    <string name="rotate_right">Rotate right</string>
+    <string name="reset_geometry">Reset geometry</string>
+    <string name="straighten">Straighten</string>
+
+    <!-- Dialogs -->
+    <string name="revert_all_message">All edits to this photo will be removed.</string>
+    <string name="revert">Revert</string>
+    <string name="save_style">Save style</string>
+    <string name="save_style_message">Saves the current adjustments as a reusable style.</string>
+    <string name="name">Name</string>
+    <string name="reading">Reading...</string>
+    <string name="no_image_open">No image open.</string>
+    <string name="dimensions">Dimensions: %1$d x %2$d\n</string>
+    <string name="exif_capture_date">Capture date</string>
+    <string name="exif_camera">Camera</string>
+    <string name="exif_model">Model</string>
+    <string name="exif_aperture">Aperture</string>
+    <string name="exif_exposure">Exposure</string>
+    <string name="exif_iso">ISO</string>
+    <string name="exif_focal">Focal length</string>
+    <string name="no_metadata">No metadata available.</string>
+    <string name="metadata_error">Could not read the metadata.</string>
+    <string name="default_export">Default export</string>
+    <string name="quality">Quality: %1$d</string>
+    <string name="export_saved_hint">The exported image is saved to Pictures/revela.</string>
+    <string name="language">Language</string>
+    <string name="system">System</string>
+    <string name="spanish">Spanish</string>
+    <string name="english">English</string>
+    <string name="toolbar">Tool bar</string>
+    <string name="favorites_editor_hint">Choose the tools you see below the photo.</string>
+    <string name="about_description">Offline photo editor for Android, with an editing flow inspired by Snapseed (clean reimplementation).</string>
+    <string name="version_label">Version %1$s</string>
+    <string name="license_label">License AGPL-3.0</string>
+    <string name="delete_style">Delete style</string>
+    <string name="delete_style_message">The style "%1$s" will be deleted. The photo is not touched.</string>
+
+    <!-- Export -->
+    <string name="export_saved">Saved to Pictures/revela.</string>
+    <string name="export_error">Error exporting: %1$s</string>
+    <string name="share_image">Share image</string>
+    <string name="export_image">Export image</string>
+    <string name="share_after_export">Share after export</string>
+    <string name="export_save_hint">Saved to Pictures/revela (max 4096 px per side).</string>
+    <string name="export">Export</string>
+    <string name="customize_toolbar">Customize tool bar</string>
+    <string name="remove_from_favorites">Remove from favorites</string>
+    <string name="add_to_favorites">Add to favorites</string>
+
+    <!-- Home -->
+    <string name="sort_recent">Most recent</string>
+    <string name="sort_oldest">Oldest</string>
+    <string name="sort_name_az">Name (A-Z)</string>
+    <string name="sort_name_za">Name (Z-A)</string>
+    <string name="sort_photos">Sort photos</string>
+    <string name="toggle_view">Toggle view</string>
+    <string name="empty_library">No edits yet.\nOpen a photo with the + button.</string>
+    <string name="delete_session">Delete session</string>
+    <string name="delete_edit">Delete edit</string>
+    <string name="delete_session_message">The saved adjustments of "%1$s" will be deleted. The original photo is not touched.</string>
+    <string name="relative_now">now</string>
+    <string name="relative_minutes">%1$d min ago</string>
+    <string name="relative_hours">%1$d h ago</string>
+    <string name="relative_days">%1$d d ago</string>
+
+    <!-- Welcome wizard -->
+    <string name="welcome_title">Welcome to revela</string>
+    <string name="welcome_body1">Fast photo editing in the Snapseed style: real adjustments, no gimmick filters.</string>
+    <string name="welcome_title2">100% offline</string>
+    <string name="welcome_body2">No accounts and no cloud. Your photos never leave the device.</string>
+    <string name="welcome_title3">The key gesture</string>
+    <string name="welcome_body3">In Tune image: drag vertically to choose a parameter and horizontally for the value. The wand improves your photo instantly.</string>
+    <string name="skip">Skip</string>
+    <string name="next">Next</string>
+    <string name="start">Start</string>
+
+    <!-- Misc -->
+    <string name="cannot_open_photo">Could not open the photo</string>
+</resources>

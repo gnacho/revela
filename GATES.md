@@ -108,3 +108,8 @@ Scope: FASE 11 completa en 5 paquetes ordenados: HOME (biblioteca de sesiones pe
   CHECK: cd /home/nacho/Documentos/Repos/revela-git && ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && ./gradlew assembleRelease -q > /dev/null 2>&1 && python3 ~/temp/opencode-work/revela-gates/g14.py 2>&1 | tail -1 && python3 ~/temp/opencode-work/revela-gates/g16.py 2>&1 | tail -1 && python3 ~/temp/opencode-work/revela-gates/g18.py 2>&1 | tail -1
   EXPECT: HOME_GATE_OK + GRID28_OK + LOOKANIM_OK
   EVIDENCE: ejecutado 19-Oct-2026; g14, g15, g16, g16func y g18 todos OK tras el tema claro (106/106 tests + banco emulador)
+
+- [x] G20: Barra fija oculta con Herramientas expandida (reaparece al colapsar) e i18n ES/EN con selector Idioma en Configuracion
+  CHECK: ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && ./gradlew assembleRelease -q > /dev/null 2>&1 && python3 ~/temp/opencode-work/revela-gates/g20.py 2>&1 | tail -1
+  EXPECT: LANG_FAVBAR_OK
+  EVIDENCE: ejecutado 19-Oct-2026 en emulador es-ES: LANG_FAVBAR_OK (barra oculta/visible con Herramientas + cambio ES->EN->ES en caliente recreando la actividad); 106/106 tests JVM; G14/G15/G16/G16func/G18 reverificados en verde tras alinear tildes de los textos.
