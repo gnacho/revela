@@ -90,6 +90,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -488,6 +489,10 @@ fun EditorScreen(
     var renderJob by remember { mutableStateOf<Job?>(null) }
     var workingGeometry by remember { mutableStateOf<GeometryModel?>(null) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var showImageDetails by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
+    var appSettings by remember { mutableStateOf(app.revela.core.SettingsStore.load(context.filesDir)) }
     var cropDrawMode by remember { mutableStateOf(false) }
     var viewScale by remember { mutableFloatStateOf(1f) }
     var viewOffset by remember { mutableStateOf(Offset.Zero) }
@@ -974,12 +979,33 @@ fun EditorScreen(
                     ) { Icon(Icons.Outlined.MoreVert, "Menu", tint = Ui.icon) }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                         DropdownMenuItem(
+                            text = { Text("Detalles de la imagen") },
+                            onClick = {
+                                showMenu = false
+                                showImageDetails = true
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Revertir todo") },
                             onClick = {
                                 showMenu = false
                                 showRevertConfirm = true
                             },
                             enabled = stack.edits.isNotEmpty() || geometry != GeometryModel()
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Configuracion") },
+                            onClick = {
+                                showMenu = false
+                                showSettings = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Acerca de") },
+                            onClick = {
+                                showMenu = false
+                                showAbout = true
+                            }
                         )
                     }
                 }
@@ -1050,15 +1076,6 @@ fun EditorScreen(
                 }) { Icon(Icons.Outlined.Check, "Listo", tint = Ui.icon) }
             }
         }
-        if (activeTool == null && base != null) {
-            FavoritesBar(
-                favorites = favorites,
-                onSelect = {
-                    activeTool = it
-                    bottomTab = BottomTab.NONE
-                }
-            )
-        }
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1127,10 +1144,25 @@ fun EditorScreen(
                         }
                         .let { mod ->
                             if (toolNow == null) {
-                                mod.pointerInput(b) {
+                                mod.pointerInput(b, g, frameW, frameH, w, h) {
                                     detectTransformGestures { _, pan, zoom, _ ->
-                                        viewScale = (viewScale * zoom).coerceIn(1f, 6f)
-                                        viewOffset += pan
+                                        val newScale = (viewScale * zoom).coerceIn(1f, 6f)
+                                        viewScale = newScale
+                                        // Limite de pan: la foto no puede salirse del recuadro
+                                        // (borde de la imagen escalada siempre dentro del viewport).
+                                        val offXpx = -g.cropLeft * frameW
+                                        val offYpx = -g.cropTop * frameH
+                                        fun clampAxis(img: Float, box: Float, offPx: Float, cur: Float, delta: Float): Float {
+                                            val imgLeft = (box - img) / 2f + offPx
+                                            val c = box / 2f
+                                            val minT = -c - (imgLeft - c) * newScale
+                                            val maxT = box - c - (imgLeft + img - c) * newScale
+                                            return if (minT >= maxT) 0f else (cur + delta).coerceIn(minT, maxT)
+                                        }
+                                        viewOffset = Offset(
+                                            x = clampAxis(frameW, w, offXpx, viewOffset.x, pan.x),
+                                            y = clampAxis(frameH, h, offYpx, viewOffset.y, pan.y)
+                                        )
                                     }
                                 }
                             } else {
@@ -2733,6 +2765,15 @@ fun EditorScreen(
                 }
             }
         }
+        if (activeTool == null && base != null) {
+            FavoritesBar(
+                favorites = favorites,
+                onSelect = {
+                    activeTool = it
+                    bottomTab = BottomTab.NONE
+                }
+            )
+        }
         // Barra de pestañas fija (la foto nunca cambia de altura al abrir paneles)
         if (activeTool == null) {
             Column(
@@ -2812,6 +2853,112 @@ fun EditorScreen(
         )
     }
 
+    // Detalles de la imagen: dimensiones + EXIF basico de la foto original
+    if (showImageDetails) {
+        var details by remember { mutableStateOf("Leyendo...") }
+        LaunchedEffect(sourceUri) {
+            val u = sourceUri
+            details = if (u == null) {
+                "No hay imagen abierta."
+            } else {
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        val resolver = context.contentResolver
+                        val sb = StringBuilder()
+                        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        resolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+                        if (bounds.outWidth > 0) {
+                            sb.append("Dimensiones: ${bounds.outWidth} x ${bounds.outHeight}\n")
+                        }
+                        resolver.openInputStream(u)?.use { input ->
+                            val exif = androidx.exifinterface.media.ExifInterface(input)
+                            fun tag(label: String, t: String) {
+                                exif.getAttribute(t)?.let { sb.append("$label: $it\n") }
+                            }
+                            tag("Fecha de captura", androidx.exifinterface.media.ExifInterface.TAG_DATETIME_ORIGINAL)
+                            tag("Camara", androidx.exifinterface.media.ExifInterface.TAG_MAKE)
+                            tag("Modelo", androidx.exifinterface.media.ExifInterface.TAG_MODEL)
+                            tag("Apertura", androidx.exifinterface.media.ExifInterface.TAG_F_NUMBER)
+                            tag("Exposicion", androidx.exifinterface.media.ExifInterface.TAG_EXPOSURE_TIME)
+                            tag("ISO", androidx.exifinterface.media.ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)
+                            tag("Focal", androidx.exifinterface.media.ExifInterface.TAG_FOCAL_LENGTH)
+                        }
+                        if (sb.isEmpty()) "Sin metadatos disponibles." else sb.toString().trim()
+                    }.getOrDefault("No se pudieron leer los metadatos.")
+                }
+            }
+        }
+        AlertDialog(
+            onDismissRequest = { showImageDetails = false },
+            title = { Text("Detalles de la imagen") },
+            text = { Text(details) },
+            confirmButton = {
+                TextButton(onClick = { showImageDetails = false }) { Text("Cerrar") }
+            }
+        )
+    }
+
+    // Configuracion: formato y calidad de export por defecto
+    if (showSettings) {
+        var cfgPng by remember { mutableStateOf(appSettings.exportPng) }
+        var cfgQuality by remember { mutableIntStateOf(appSettings.exportQuality) }
+        AlertDialog(
+            onDismissRequest = { showSettings = false },
+            title = { Text("Configuracion") },
+            text = {
+                Column {
+                    Text("Exportar por defecto", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = !cfgPng, onClick = { cfgPng = false }, label = { Text("JPEG") })
+                        FilterChip(selected = cfgPng, onClick = { cfgPng = true }, label = { Text("PNG") })
+                    }
+                    if (!cfgPng) {
+                        Text("Calidad: $cfgQuality", fontSize = 13.sp)
+                        Slider(
+                            value = cfgQuality.toFloat(),
+                            onValueChange = { cfgQuality = it.toInt() },
+                            valueRange = 60f..100f
+                        )
+                    }
+                    Text(
+                        "La imagen exportada se guarda en Imagenes/revela.",
+                        fontSize = 12.sp,
+                        color = Ui.textDim
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    appSettings = app.revela.core.AppSettings(exportPng = cfgPng, exportQuality = cfgQuality)
+                    app.revela.core.SettingsStore.save(context.filesDir, appSettings)
+                    showSettings = false
+                }) { Text("Guardar") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showSettings = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    if (showAbout) {
+        AlertDialog(
+            onDismissRequest = { showAbout = false },
+            title = { Text("revela") },
+            text = {
+                Column {
+                    Text("Editor de fotos offline para Android, con el flujo de edicion inspirado en Snapseed (reimplementacion limpia).", fontSize = 14.sp)
+                    Spacer(Modifier.height(10.dp))
+                    Text("Version ${app.revela.BuildConfig.VERSION_NAME}", fontSize = 13.sp, color = Ui.textDim)
+                    Text("Licencia AGPL-3.0", fontSize = 13.sp, color = Ui.textDim)
+                    Text("github.com/gnacho/revela", fontSize = 13.sp, color = Ui.textDim)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAbout = false }) { Text("Cerrar") }
+            }
+        )
+    }
+
     deleteStyle?.let { cs ->
         AlertDialog(
             onDismissRequest = { deleteStyle = null },
@@ -2833,8 +2980,9 @@ fun EditorScreen(
 
     if (sourceUri != null && showExportDialog) {
         ExportDialog(
+            defaults = appSettings,
             onDismiss = { showExportDialog = false },
-            onExport = { options ->
+            onExport = { options, share ->
                 showExportDialog = false
                 scope.launch {
                     val result = ExportProcessor.export(
@@ -2843,12 +2991,25 @@ fun EditorScreen(
                     result.onFailure {
                         android.util.Log.e("revela", "export fallo", it)
                     }
+                    val uri = result.getOrNull()
                     Toast.makeText(
                         context,
                         if (result.isSuccess) "Guardado en Imagenes/revela"
                         else "Error al exportar: ${result.exceptionOrNull()?.message}",
                         Toast.LENGTH_LONG
                     ).show()
+                    if (share && uri != null) {
+                        runCatching {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = if (options.png) "image/png" else "image/jpeg"
+                                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(
+                                android.content.Intent.createChooser(intent, "Compartir imagen")
+                            )
+                        }
+                    }
                 }
             }
         )
@@ -3360,11 +3521,13 @@ private fun hitHandle(
 
 @Composable
 fun ExportDialog(
+    defaults: app.revela.core.AppSettings,
     onDismiss: () -> Unit,
-    onExport: (ExportOptions) -> Unit
+    onExport: (ExportOptions, Boolean) -> Unit
 ) {
-    var png by remember { mutableStateOf(false) }
-    var quality by remember { mutableIntStateOf(92) }
+    var png by remember { mutableStateOf(defaults.exportPng) }
+    var quality by remember { mutableIntStateOf(defaults.exportQuality) }
+    var share by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -3383,6 +3546,10 @@ fun ExportDialog(
                         valueRange = 60f..100f
                     )
                 }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = share, onCheckedChange = { share = it })
+                    Text("Compartir tras exportar", fontSize = 13.sp)
+                }
                 Text(
                     "Se guarda en Imagenes/revela (max 4096 px de lado).",
                     fontSize = 12.sp,
@@ -3391,7 +3558,7 @@ fun ExportDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onExport(ExportOptions(png = png, quality = quality)) }) {
+            Button(onClick = { onExport(ExportOptions(png = png, quality = quality), share) }) {
                 Text("Exportar")
             }
         },
@@ -3470,7 +3637,7 @@ fun ToolsGrid(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .fillMaxHeight(0.72f)
+            .fillMaxHeight(0.6f)
             .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
             .background(Ui.sheet)
     ) {
