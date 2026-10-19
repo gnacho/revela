@@ -426,6 +426,9 @@ class MainActivity : ComponentActivity() {
                     var startUri by remember { mutableStateOf<Uri?>(null) }
                     var startSessionId by remember { mutableStateOf<String?>(null) }
                     var homeTick by remember { mutableIntStateOf(0) }
+                    var appSettings by remember {
+                        mutableStateOf(app.revela.core.SettingsStore.load(context.filesDir))
+                    }
                     var showWelcome by remember {
                         mutableStateOf(!WelcomeStore.isSeen(context.filesDir))
                     }
@@ -434,6 +437,11 @@ class MainActivity : ComponentActivity() {
                         when (screen) {
                             "home" -> HomeScreen(
                                 refreshTick = homeTick,
+                                appSettings = appSettings,
+                                onSettingsChange = {
+                                    appSettings = it
+                                    app.revela.core.SettingsStore.save(context.filesDir, it)
+                                },
                                 onOpenPhoto = { uri ->
                                     startUri = uri
                                     startSessionId = null

@@ -4,11 +4,13 @@ import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** Ajustes de revela (export por defecto). Persistente en filesDir. */
+/** Ajustes de revela (export por defecto, orden y vista de la biblioteca). Persistente en filesDir. */
 @Serializable
 data class AppSettings(
     val exportPng: Boolean = false,
-    val exportQuality: Int = 92
+    val exportQuality: Int = 92,
+    val sortMode: String = "recent",   // recent | oldest | name_az | name_za
+    val viewMode: String = "grid"      // grid | list
 )
 
 object SettingsStore {
