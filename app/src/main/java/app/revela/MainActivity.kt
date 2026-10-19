@@ -12,6 +12,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -1281,14 +1282,27 @@ fun EditorScreen(
         }
         // Con un panel abierto (Herramientas/Estilos) la foto sube como franja superior
         // siempre visible; con herramienta activa o nada abierto, ocupa todo el espacio.
+        // La transicion se ANIMA: se mide la altura expandida y se interpola 200dp <-> expandida.
         val panelOpen = activeTool == null && bottomTab != BottomTab.NONE && base != null
+        var expandedPhotoPx by remember { mutableStateOf(0) }
+        val density = LocalDensity.current
+        val expandedPhotoDp = with(density) { expandedPhotoPx.toDp() }
+        val photoHeight by animateDpAsState(
+            targetValue = if (panelOpen) 200.dp else expandedPhotoDp,
+            animationSpec = tween(220, easing = FastOutSlowInEasing),
+            label = "photoStrip"
+        )
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
-                    if (panelOpen) Modifier.height(200.dp)
-                    else Modifier.weight(1f)
+                    if (expandedPhotoPx == 0 && !panelOpen) Modifier.weight(1f)
+                    else Modifier.height(photoHeight)
                 )
+                .onSizeChanged {
+                    // Altura de referencia = la que tiene con la biblioteca sin paneles
+                    if (!panelOpen && it.height > 0) expandedPhotoPx = it.height
+                }
                 .padding(horizontal = 16.dp, vertical = if (panelOpen) 8.dp else 14.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -2903,8 +2917,18 @@ fun EditorScreen(
                 }
             }
         }
-        // Panel de herramientas en ESPACIO REAL bajo la franja de la foto (no solapa)
-        if (activeTool == null && bottomTab == BottomTab.TOOLS && base != null) {
+        // Panel de herramientas en ESPACIO REAL bajo la franja de la foto, entra deslizandose
+        AnimatedVisibility(
+            visible = activeTool == null && bottomTab == BottomTab.TOOLS && base != null,
+            enter = slideInVertically(
+                initialOffsetY = { it / 2 },
+                animationSpec = tween(220, easing = FastOutSlowInEasing)
+            ) + fadeIn(tween(220)),
+            exit = slideOutVertically(
+                targetOffsetY = { it / 2 },
+                animationSpec = tween(180, easing = FastOutSlowInEasing)
+            ) + fadeOut(tween(180))
+        ) {
             ToolsGrid(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2917,8 +2941,19 @@ fun EditorScreen(
                 }
             )
         }
-        // Carrusel de estilos en espacio real bajo la franja de la foto
-        if (activeTool == null && bottomTab == BottomTab.LOOKS && base != null) {
+        // Carrusel de estilos en espacio real bajo la franja de la foto, entra deslizandose
+        AnimatedVisibility(
+            visible = activeTool == null && bottomTab == BottomTab.LOOKS && base != null,
+            enter = slideInVertically(
+                initialOffsetY = { it / 2 },
+                animationSpec = tween(220, easing = FastOutSlowInEasing)
+            ) + fadeIn(tween(220)),
+            exit = slideOutVertically(
+                targetOffsetY = { it / 2 },
+                animationSpec = tween(180, easing = FastOutSlowInEasing)
+            ) + fadeOut(tween(180))
+        ) {
+            if (activeTool == null && base != null) {
             LooksCarousel(
                 thumbs = lookThumbs,
                 selectedId = stack.edits.filterIsInstance<Edit.Look>().lastOrNull()?.id ?: "none",
@@ -2949,8 +2984,15 @@ fun EditorScreen(
                     showStyleNameDialog = true
                 }
             )
+            }
         }
-        if (activeTool == null && base != null && bottomTab != BottomTab.TOOLS) {
+        // La barra de favoritos solo vive sin paneles: al abrir Estilos/Herramientas se va
+        // deslizandose hacia abajo (issue #2: antes quedaba visible en Estilos).
+        AnimatedVisibility(
+            visible = activeTool == null && base != null && bottomTab == BottomTab.NONE,
+            exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(180, easing = FastOutSlowInEasing)) + fadeOut(tween(180)),
+            enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeIn(tween(220))
+        ) {
             FavoritesBar(
                 favorites = favorites,
                 onSelect = {
