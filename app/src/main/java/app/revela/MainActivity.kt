@@ -110,6 +110,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -406,6 +407,14 @@ class MainActivity : ComponentActivity() {
         super.attachBaseContext(app.revela.core.LocaleHelper.apply(newBase, lang))
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        // El contexto real de la activity no es el que devuelve attachBaseContext, asi que se
+        // re-aplica aqui para que getString (toasts y textos fuera de Compose) use el idioma elegido.
+        val lang = app.revela.core.SettingsStore.load(filesDir).language
+        if (lang != "system") app.revela.core.LocaleHelper.apply(this, lang)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
@@ -463,14 +472,17 @@ class MainActivity : ComponentActivity() {
                                     screen = "editor"
                                 }
                             )
-                            else -> EditorScreen(
+                            else -> key(startUri) {
+                            EditorScreen(
                                 initialUri = startUri,
                                 initialSessionId = startSessionId,
                                 onHome = {
                                     homeTick++
                                     screen = "home"
-                                }
+                                },
+                                onChanged = { homeTick++ }
                             )
+                            }
                         }
                         if (showWelcome) {
                             WelcomeWizard(
@@ -491,7 +503,8 @@ class MainActivity : ComponentActivity() {
 fun EditorScreen(
     initialUri: Uri? = null,
     initialSessionId: String? = null,
-    onHome: () -> Unit = {}
+    onHome: () -> Unit = {},
+    onChanged: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -531,7 +544,7 @@ fun EditorScreen(
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
-            Toast.makeText(context, R.string.delete_original_done, Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.delete_original_done), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -545,7 +558,7 @@ fun EditorScreen(
             }
         }.getOrDefault(false)
         if (deleted) {
-            Toast.makeText(context, R.string.delete_original_done, Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.delete_original_done), Toast.LENGTH_SHORT).show()
             return
         }
         val esPicker = u.authority?.contains("photopicker") == true || u.path?.contains("/picker/") == true
@@ -556,12 +569,12 @@ fun EditorScreen(
                     androidx.activity.result.IntentSenderRequest.Builder(pi.intentSender).build()
                 )
             }.onFailure {
-                Toast.makeText(context, R.string.delete_original_error, Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.delete_original_error), Toast.LENGTH_SHORT).show()
             }
         } else if (esPicker) {
-            Toast.makeText(context, R.string.delete_original_repick, Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.getString(R.string.delete_original_repick), Toast.LENGTH_LONG).show()
         } else {
-            Toast.makeText(context, R.string.delete_original_error, Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.delete_original_error), Toast.LENGTH_SHORT).show()
         }
     }
     var showRevertConfirm by remember { mutableStateOf(false) }
@@ -3111,9 +3124,12 @@ fun EditorScreen(
                     }
                     Toast.makeText(
                         context,
-                        if (ok) R.string.note_saved else R.string.note_error,
+                        context.getString(if (ok) R.string.note_saved else R.string.note_error),
                         Toast.LENGTH_SHORT
                     ).show()
+                    // La nota se escribe en el indice fuera del estado de Compose: avisar a la
+                    // biblioteca para que recalcule filtros y "Con nota" al volver.
+                    if (ok) onChanged()
                     showNote = false
                 }) { Text(stringResource(R.string.note_save)) }
             },
