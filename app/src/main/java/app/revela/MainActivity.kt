@@ -4165,12 +4165,12 @@ fun FavoritesBar(
     ) {
         favorites.forEach { id ->
             val item = catalog.find { it.first.id == id } ?: return@forEach
-            IconButton(onClick = { onSelect(item.first) }, modifier = Modifier.size(50.dp)) {
-                Icon(item.second, stringResource(item.third), tint = Ui.icon, modifier = Modifier.size(38.dp))
+            IconButton(onClick = { onSelect(item.first) }, modifier = Modifier.size(40.dp)) {
+                Icon(item.second, stringResource(item.third), tint = Ui.icon, modifier = Modifier.size(26.dp))
             }
         }
-        IconButton(onClick = onEdit, modifier = Modifier.size(50.dp)) {
-            Icon(Icons.Outlined.Edit, stringResource(R.string.customize_toolbar), tint = Ui.textDim, modifier = Modifier.size(34.dp))
+        IconButton(onClick = onEdit, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Outlined.Edit, stringResource(R.string.customize_toolbar), tint = Ui.textDim, modifier = Modifier.size(24.dp))
         }
     }
 }
@@ -4215,7 +4215,7 @@ fun ToolsGrid(
                                 Icon(
                                     icon, stringResource(label),
                                     tint = Ui.icon,
-                                    modifier = Modifier.size(38.dp)
+                                    modifier = Modifier.size(26.dp)
                                 )
                                 Text(
                                     stringResource(label),
@@ -4230,13 +4230,13 @@ fun ToolsGrid(
                                 onClick = { onToggleFavorite(tool.id) },
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
-                                    .size(30.dp)
+                                    .size(26.dp)
                             ) {
                                 Icon(
                                     if (fav) Icons.Filled.Star else Icons.Outlined.StarBorder,
                                     contentDescription = if (fav) stringResource(R.string.remove_from_favorites) else stringResource(R.string.add_to_favorites),
                                     tint = if (fav) Ui.accent else Ui.line,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         }
