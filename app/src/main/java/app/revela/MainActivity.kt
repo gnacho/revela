@@ -2966,14 +2966,13 @@ fun EditorScreen(
             }
         }
         // Carrusel de estilos: sube por encima de la parte inferior de la foto.
-        // Muelle criticamente amortiguado (dampingRatio = 1.0f): suave y sin rebote
-        // al desplegar, sin la sobreoscilacion del muelle subamortiguado anterior.
+        // entrada con tween suave: sin muelle, sin rebote
         androidx.compose.animation.AnimatedVisibility(
             modifier = Modifier.align(Alignment.BottomCenter),
             visible = activeTool == null && bottomTab == BottomTab.LOOKS && base != null,
             enter = slideInVertically(
                 initialOffsetY = { it },
-                animationSpec = spring(dampingRatio = 1.0f, stiffness = 180f)
+                animationSpec = tween(240, easing = FastOutSlowInEasing)
             ) + fadeIn(tween(180)),
             exit = slideOutVertically(
                 targetOffsetY = { it },
@@ -3032,7 +3031,7 @@ fun EditorScreen(
         AnimatedVisibility(
             visible = activeTool == null && base != null && bottomTab == BottomTab.NONE,
             exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(150, easing = FastOutSlowInEasing)) + fadeOut(tween(150)),
-            enter = slideInVertically(initialOffsetY = { it }, animationSpec = spring(dampingRatio = 0.82f, stiffness = 380f)) + fadeIn(tween(140))
+            enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeIn(tween(140))
         ) {
             FavoritesBar(
                 favorites = favorites,
