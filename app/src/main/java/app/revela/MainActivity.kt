@@ -2987,14 +2987,14 @@ fun EditorScreen(
             }
         }
         // Carrusel de estilos: sube por encima de la parte inferior de la foto.
-        // Muelle aun mas suave: amortiguacion alta y rigidez baja para que el
-        // carrusel no suba y baje bruscamente.
+        // Muelle criticamente amortiguado (dampingRatio = 1.0f): suave y sin rebote
+        // al desplegar, sin la sobreoscilacion del muelle subamortiguado anterior.
         androidx.compose.animation.AnimatedVisibility(
             modifier = Modifier.align(Alignment.BottomCenter),
             visible = activeTool == null && bottomTab == BottomTab.LOOKS && base != null,
             enter = slideInVertically(
                 initialOffsetY = { it },
-                animationSpec = spring(dampingRatio = 0.95f, stiffness = 160f)
+                animationSpec = spring(dampingRatio = 1.0f, stiffness = 180f)
             ) + fadeIn(tween(180)),
             exit = slideOutVertically(
                 targetOffsetY = { it },
