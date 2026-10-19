@@ -204,6 +204,7 @@
     <string name="default_export">Exportar por defecto</string>
     <string name="quality">Calidad: %1$d</string>
     <string name="export_saved_hint">La imagen exportada se guarda en Imágenes/revela.</string>
+    <string name="tools_all">Todas</string>
     <string name="tool_tip">Consejos</string>
     <string name="manage_style">Gestionar estilo</string>
     <string name="style_name">Nombre del estilo</string>
