@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -1282,27 +1283,18 @@ fun EditorScreen(
         }
         // Con un panel abierto (Herramientas/Estilos) la foto sube como franja superior
         // siempre visible; con herramienta activa o nada abierto, ocupa todo el espacio.
-        // La transicion se ANIMA: se mide la altura expandida y se interpola 200dp <-> expandida.
+        // La transicion se ANIMA con animateContentSize: interpola el tamano de la foto
+        // entre weight(1f) y height(200dp) SIN medir nada (la medida con onSizeChanged
+        // entro en bucle de realimentacion y encogia la foto).
         val panelOpen = activeTool == null && bottomTab != BottomTab.NONE && base != null
-        var expandedPhotoPx by remember { mutableStateOf(0) }
-        val density = LocalDensity.current
-        val expandedPhotoDp = with(density) { expandedPhotoPx.toDp() }
-        val photoHeight by animateDpAsState(
-            targetValue = if (panelOpen) 200.dp else expandedPhotoDp,
-            animationSpec = tween(220, easing = FastOutSlowInEasing),
-            label = "photoStrip"
-        )
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
+                .animateContentSize(tween(220, easing = FastOutSlowInEasing))
                 .then(
-                    if (expandedPhotoPx == 0 && !panelOpen) Modifier.weight(1f)
-                    else Modifier.height(photoHeight)
+                    if (panelOpen) Modifier.height(200.dp)
+                    else Modifier.weight(1f)
                 )
-                .onSizeChanged {
-                    // Altura de referencia = la que tiene con la biblioteca sin paneles
-                    if (!panelOpen && it.height > 0) expandedPhotoPx = it.height
-                }
                 .padding(horizontal = 16.dp, vertical = if (panelOpen) 8.dp else 14.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -2917,8 +2909,13 @@ fun EditorScreen(
                 }
             }
         }
-        // Panel de herramientas en ESPACIO REAL bajo la franja de la foto, entra deslizandose
+        // Panel de herramientas en ESPACIO REAL bajo la franja de la foto, entra deslizandose.
+        // El weight va en el AnimatedVisibility (hijo directo de la Column) para que la barra
+        // de pestanas quede SIEMPRE abajo aunque el panel este animandose.
         AnimatedVisibility(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
             visible = activeTool == null && bottomTab == BottomTab.TOOLS && base != null,
             enter = slideInVertically(
                 initialOffsetY = { it / 2 },
@@ -2943,6 +2940,9 @@ fun EditorScreen(
         }
         // Carrusel de estilos en espacio real bajo la franja de la foto, entra deslizandose
         AnimatedVisibility(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
             visible = activeTool == null && bottomTab == BottomTab.LOOKS && base != null,
             enter = slideInVertically(
                 initialOffsetY = { it / 2 },
