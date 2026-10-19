@@ -163,4 +163,36 @@ class SessionIndexStoreTest {
     fun `load de id inexistente devuelve null`() {
         assertNull(SessionIndexStore.load(tmpDir(), "nope"))
     }
+
+    @Test
+    fun `setNote persiste la nota y upsert la conserva`() {
+        val dir = tmpDir()
+        val uri = "content://a/nota"
+        val id = SessionIndexStore.upsert(dir, uri, stackWithExposure(), GeometryModel(), now = 1000L)
+        SessionIndexStore.setNote(dir, id, "probar recorte 4:3")
+        assertEquals("probar recorte 4:3", SessionIndexStore.list(dir).single().note)
+        // Un upsert posterior (mismo id) no debe borrar la nota
+        SessionIndexStore.upsert(dir, uri, stackWithExposure(), GeometryModel(), now = 2000L)
+        assertEquals("probar recorte 4:3", SessionIndexStore.list(dir).single().note)
+    }
+
+    @Test
+    fun `indice antiguo sin campo note decodifica con nota vacia`() {
+        val dir = tmpDir()
+        File(dir, "revela_index.json").writeText(
+            """[{"id":"abc","uri":"content://a/1","displayName":"1","thumbPath":"","lastOpenedAt":1000}]"""
+        )
+        assertEquals("", SessionIndexStore.list(dir).single().note)
+    }
+
+    @Test
+    fun `hasLook detecta sesiones con EditLook`() {
+        val dir = tmpDir()
+        val sinLook = SessionIndexStore.upsert(dir, "content://a/sin", stackWithExposure(), GeometryModel(), now = 1000L)
+        val conLook = SessionIndexStore.upsert(
+            dir, "content://a/con", EditStack(listOf(Edit.Look("warm"))), GeometryModel(), now = 2000L
+        )
+        assertFalse(SessionIndexStore.hasLook(dir, sinLook))
+        assertTrue(SessionIndexStore.hasLook(dir, conLook))
+    }
 }

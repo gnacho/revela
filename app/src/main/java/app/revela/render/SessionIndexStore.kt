@@ -1,5 +1,6 @@
 package app.revela.render
 
+import app.revela.core.Edit
 import app.revela.core.EditStack
 import app.revela.core.GeometryModel
 import app.revela.core.SessionEntry
@@ -69,13 +70,15 @@ object SessionIndexStore {
             val prev = SessionIndexCodec.fromJson(indexFile(dir).readTextIfExists())
             val thumbPath = prev.firstOrNull { it.id == id }?.thumbPath
                 ?: if (thumbFile(dir, id).exists()) thumbRelPath(id) else ""
+            val note = prev.firstOrNull { it.id == id }?.note ?: ""
             val entries = prev.filterNot { it.id == id }
             val updated = entries + SessionEntry(
                 id = id,
                 uri = uri,
                 displayName = SessionIndexCodec.displayNameFromUri(uri),
                 thumbPath = thumbPath,
-                lastOpenedAt = now
+                lastOpenedAt = now,
+                note = note
             )
             indexFile(dir).writeText(SessionIndexCodec.toJson(updated))
             prune(dir, updated)
@@ -103,6 +106,19 @@ object SessionIndexStore {
             .filterNot { it.id == id }
         indexFile(dir).writeText(SessionIndexCodec.toJson(entries))
     }
+
+    /** Nota libre asociada a una sesion (cadena vacia = sin nota). */
+    fun setNote(dir: File, id: String, note: String) {
+        runCatching {
+            val entries = SessionIndexCodec.fromJson(indexFile(dir).readTextIfExists())
+            val updated = entries.map { if (it.id == id) it.copy(note = note) else it }
+            indexFile(dir).writeText(SessionIndexCodec.toJson(updated))
+        }
+    }
+
+    /** True si la sesion tiene al menos un Edit.Look aplicado. */
+    fun hasLook(dir: File, id: String): Boolean =
+        load(dir, id)?.first?.edits?.any { it is Edit.Look } == true
 
     /** Importa la sesion unica legacy (revela_session.json) si el indice todavia no existe. */
     fun migrateLegacy(dir: File) {

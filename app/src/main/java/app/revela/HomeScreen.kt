@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +43,7 @@ import androidx.compose.material.icons.outlined.ViewModule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -99,6 +102,8 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     var entries by remember { mutableStateOf<List<SessionEntry>>(emptyList()) }
     var thumbs by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
+    var lookIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var filter by remember { mutableStateOf("all") }
     var confirmDelete by remember { mutableStateOf<SessionEntry?>(null) }
     var sortMenuOpen by remember { mutableStateOf(false) }
 
@@ -117,6 +122,8 @@ fun HomeScreen(
                 }
             }
             thumbs = map
+            lookIds = list.filter { SessionIndexStore.hasLook(context.filesDir, it.id) }
+                .map { it.id }.toSet()
         }
     }
 
@@ -198,7 +205,37 @@ fun HomeScreen(
             }
         }
 
-        if (entries.isEmpty()) {
+        val visible = when (filter) {
+            "looks" -> entries.filter { it.id in lookIds }
+            "notes" -> entries.filter { it.note.isNotBlank() }
+            else -> entries
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = filter == "all",
+                onClick = { filter = "all" },
+                label = { Text(stringResource(R.string.filter_all), fontSize = 12.sp) }
+            )
+            FilterChip(
+                selected = filter == "looks",
+                onClick = { filter = "looks" },
+                label = { Text(stringResource(R.string.filter_looks), fontSize = 12.sp) }
+            )
+            FilterChip(
+                selected = filter == "notes",
+                onClick = { filter = "notes" },
+                label = { Text(stringResource(R.string.filter_notes), fontSize = 12.sp) }
+            )
+        }
+
+        if (visible.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -206,7 +243,7 @@ fun HomeScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    stringResource(R.string.empty_library),
+                    stringResource(if (entries.isEmpty()) R.string.empty_library else R.string.filter_empty),
                     color = Ui.textDim,
                     fontSize = 15.sp,
                     lineHeight = 22.sp
@@ -218,7 +255,7 @@ fun HomeScreen(
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(entries, key = { it.id }) { entry ->
+                items(visible, key = { it.id }) { entry ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -267,6 +304,15 @@ fun HomeScreen(
                                 color = Ui.textDim,
                                 fontSize = 12.sp
                             )
+                            if (entry.note.isNotBlank()) {
+                                Text(
+                                    entry.note,
+                                    color = Ui.accent,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                         IconButton(onClick = { confirmDelete = entry }) {
                             Icon(
@@ -287,7 +333,7 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(entries, key = { it.id }) { entry ->
+                items(visible, key = { it.id }) { entry ->
                     Column {
                         Box(
                             modifier = Modifier
@@ -345,6 +391,15 @@ fun HomeScreen(
                             fontSize = 10.sp,
                             maxLines = 1
                         )
+                        if (entry.note.isNotBlank()) {
+                            Text(
+                                entry.note,
+                                color = Ui.accent,
+                                fontSize = 10.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }

@@ -12,7 +12,8 @@ data class SessionEntry(
     val uri: String,
     val displayName: String,
     val thumbPath: String,
-    val lastOpenedAt: Long
+    val lastOpenedAt: Long,
+    val note: String = ""
 )
 
 /** Codec JSON puro (testeable en JVM) del indice de sesiones. */

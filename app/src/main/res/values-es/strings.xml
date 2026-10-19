@@ -255,4 +255,19 @@
 
     <!-- Misc -->
     <string name="cannot_open_photo">No se pudo abrir la foto</string>
+
+    <!-- Home: filtros y notas -->
+    <string name="filter_all">Todas</string>
+    <string name="filter_looks">Con look</string>
+    <string name="filter_notes">Con nota</string>
+    <string name="filter_empty">No hay ediciones con este filtro.</string>
+    <string name="note_menu">Nota</string>
+    <string name="note_title">Nota de la foto</string>
+    <string name="note_hint">Escribe una nota para esta edición</string>
+    <string name="note_save">Guardar nota</string>
+    <!-- Eliminar foto original -->
+    <string name="delete_original">Eliminar foto original</string>
+    <string name="delete_original_message">Se eliminará la foto original del dispositivo. La edición guardada en revela no se toca.</string>
+    <string name="delete_original_done">Foto original eliminada</string>
+    <string name="delete_original_error">No se pudo eliminar la foto original</string>
 </resources>

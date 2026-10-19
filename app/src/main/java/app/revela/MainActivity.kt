@@ -524,6 +524,37 @@ fun EditorScreen(
     var tuneParam by remember { mutableStateOf(TuneParam.EXPOSURE) }
     var paramMenuVisible by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showNote by remember { mutableStateOf(false) }
+    var noteText by remember { mutableStateOf("") }
+    var showDeleteOriginal by remember { mutableStateOf(false) }
+    val deleteRequestLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            Toast.makeText(context, R.string.delete_original_done, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun deleteOriginalPhoto() {
+        val u = sourceUri ?: return
+        val rows = runCatching { context.contentResolver.delete(u, null, null) }.getOrNull()
+        if (rows != null && rows > 0) {
+            Toast.makeText(context, R.string.delete_original_done, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            runCatching {
+                val pi = android.provider.MediaStore.createDeleteRequest(context.contentResolver, listOf(u))
+                deleteRequestLauncher.launch(
+                    androidx.activity.result.IntentSenderRequest.Builder(pi.intentSender).build()
+                )
+            }.onFailure {
+                Toast.makeText(context, R.string.delete_original_error, Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(context, R.string.delete_original_error, Toast.LENGTH_SHORT).show()
+        }
+    }
     var showRevertConfirm by remember { mutableStateOf(false) }
     var lookThumbs by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
 
@@ -1008,6 +1039,19 @@ fun EditorScreen(
                             }
                         )
                         DropdownMenuItem(
+                            text = { Text(stringResource(R.string.note_menu)) },
+                            onClick = {
+                                showMenu = false
+                                val u = sourceUri
+                                noteText = if (u != null) {
+                                    val id = SessionIndexStore.idFor(u.toString())
+                                    SessionIndexStore.list(context.filesDir)
+                                        .firstOrNull { it.id == id }?.note ?: ""
+                                } else ""
+                                showNote = true
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text(stringResource(R.string.revert_all)) },
                             onClick = {
                                 showMenu = false
@@ -1027,6 +1071,18 @@ fun EditorScreen(
                             onClick = {
                                 showMenu = false
                                 showAbout = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(R.string.delete_original),
+                                    color = Color(0xFFD32F2F)
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                showDeleteOriginal = true
                             }
                         )
                     }
@@ -3016,6 +3072,58 @@ fun EditorScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showFavEditor = false }) { Text(stringResource(R.string.done)) }
+            }
+        )
+    }
+
+    if (showNote) {
+        AlertDialog(
+            onDismissRequest = { showNote = false },
+            title = { Text(stringResource(R.string.note_title)) },
+            text = {
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    placeholder = { Text(stringResource(R.string.note_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    sourceUri?.let { u ->
+                        SessionIndexStore.setNote(
+                            context.filesDir,
+                            SessionIndexStore.idFor(u.toString()),
+                            noteText.trim()
+                        )
+                    }
+                    showNote = false
+                }) { Text(stringResource(R.string.note_save)) }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showNote = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (showDeleteOriginal) {
+        AlertDialog(
+            onDismissRequest = { showDeleteOriginal = false },
+            title = { Text(stringResource(R.string.delete_original)) },
+            text = { Text(stringResource(R.string.delete_original_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteOriginal = false
+                    deleteOriginalPhoto()
+                }) { Text(stringResource(R.string.delete), color = Color(0xFFD32F2F)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteOriginal = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
             }
         )
     }

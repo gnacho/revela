@@ -113,3 +113,8 @@ Scope: FASE 11 completa en 5 paquetes ordenados: HOME (biblioteca de sesiones pe
   CHECK: ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && ./gradlew assembleRelease -q > /dev/null 2>&1 && python3 ~/temp/opencode-work/revela-gates/g20.py 2>&1 | tail -1
   EXPECT: LANG_FAVBAR_OK
   EVIDENCE: ejecutado 19-Oct-2026 en emulador es-ES: LANG_FAVBAR_OK (barra oculta/visible con Herramientas + cambio ES->EN->ES en caliente recreando la actividad); 106/106 tests JVM; G14/G15/G16/G16func/G18 reverificados en verde tras alinear tildes de los textos.
+
+- [x] G21: Nota por sesion (dialogo en menu, persistida y visible en el home), filtros del home (Todas / Con look / Con nota) y confirmacion de Eliminar foto original
+  CHECK: ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && ./gradlew assembleRelease -q > /dev/null 2>&1 && python3 ~/temp/opencode-work/revela-gates/g21.py 2>&1 | tail -1
+  EXPECT: NOTES_FILTERS_DELETE_OK
+  EVIDENCE: ejecutado 19-Oct-2026 en emulador es-ES: chips de filtro visibles, nota guardada y mostrada, Con nota filtra, Con look con 1 sesion tras aplicar Calido, Todas restaura, dialogo de borrado de original con Cancelar. 109/109 tests JVM (3 nuevos: setNote+upsert conserva, indice antiguo sin note, hasLook).

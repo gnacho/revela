@@ -255,4 +255,19 @@
 
     <!-- Misc -->
     <string name="cannot_open_photo">Could not open the photo</string>
+
+    <!-- Home: filters and notes -->
+    <string name="filter_all">All</string>
+    <string name="filter_looks">With look</string>
+    <string name="filter_notes">With note</string>
+    <string name="filter_empty">No edits match this filter.</string>
+    <string name="note_menu">Note</string>
+    <string name="note_title">Photo note</string>
+    <string name="note_hint">Write a note for this edit</string>
+    <string name="note_save">Save note</string>
+    <!-- Delete original photo -->
+    <string name="delete_original">Delete original photo</string>
+    <string name="delete_original_message">The original photo will be deleted from the device. The edit saved in revela is not touched.</string>
+    <string name="delete_original_done">Original photo deleted</string>
+    <string name="delete_original_error">Could not delete the original photo</string>
 </resources>
