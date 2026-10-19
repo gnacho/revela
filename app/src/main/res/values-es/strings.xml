@@ -270,4 +270,5 @@
     <string name="delete_original_message">Se eliminará la foto original del dispositivo. La edición guardada en revela no se toca.</string>
     <string name="delete_original_done">Foto original eliminada</string>
     <string name="delete_original_error">No se pudo eliminar la foto original</string>
+    <string name="delete_original_repick">Esta foto se abrió con el selector antiguo y no se puede borrar. Ábrela con Abrir foto para poder eliminarla.</string>
 </resources>

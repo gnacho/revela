@@ -130,12 +130,12 @@ fun HomeScreen(
     LaunchedEffect(refreshTick, appSettings.sortMode) { reload() }
 
     val pickerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
+        OpenImageDocument()
     ) { uri: Uri? ->
         if (uri != null) {
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
-                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 )
             }
             onOpenPhoto(uri)
@@ -197,9 +197,7 @@ fun HomeScreen(
                 )
             }
             IconButton(onClick = {
-                pickerLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                )
+                pickerLauncher.launch(arrayOf("image/*"))
             }) {
                 Icon(Icons.Filled.AddPhotoAlternate, stringResource(R.string.open_photo), tint = Ui.icon)
             }

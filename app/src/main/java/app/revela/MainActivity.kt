@@ -537,12 +537,19 @@ fun EditorScreen(
 
     fun deleteOriginalPhoto() {
         val u = sourceUri ?: return
-        val rows = runCatching { context.contentResolver.delete(u, null, null) }.getOrNull()
-        if (rows != null && rows > 0) {
+        val deleted = runCatching {
+            if (android.provider.DocumentsContract.isDocumentUri(context, u)) {
+                android.provider.DocumentsContract.deleteDocument(context.contentResolver, u)
+            } else {
+                context.contentResolver.delete(u, null, null) > 0
+            }
+        }.getOrDefault(false)
+        if (deleted) {
             Toast.makeText(context, R.string.delete_original_done, Toast.LENGTH_SHORT).show()
             return
         }
-        if (android.os.Build.VERSION.SDK_INT >= 30) {
+        val esPicker = u.authority?.contains("photopicker") == true || u.path?.contains("/picker/") == true
+        if (!esPicker && android.os.Build.VERSION.SDK_INT >= 30) {
             runCatching {
                 val pi = android.provider.MediaStore.createDeleteRequest(context.contentResolver, listOf(u))
                 deleteRequestLauncher.launch(
@@ -551,6 +558,8 @@ fun EditorScreen(
             }.onFailure {
                 Toast.makeText(context, R.string.delete_original_error, Toast.LENGTH_SHORT).show()
             }
+        } else if (esPicker) {
+            Toast.makeText(context, R.string.delete_original_repick, Toast.LENGTH_LONG).show()
         } else {
             Toast.makeText(context, R.string.delete_original_error, Toast.LENGTH_SHORT).show()
         }
@@ -814,12 +823,14 @@ fun EditorScreen(
     }
 
     val pickerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
+        OpenImageDocument()
     ) { uri: Uri? ->
         if (uri != null) {
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
-                    uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 )
             }
             scope.launch {
@@ -980,9 +991,7 @@ fun EditorScreen(
                 }
             }) { Icon(Icons.Outlined.Home, stringResource(R.string.back_to_library), tint = Ui.icon) }
             TextButton(onClick = {
-                pickerLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                )
+                pickerLauncher.launch(arrayOf("image/*"))
             }) {
                 Text(
                     stringResource(R.string.open),
@@ -1175,9 +1184,7 @@ fun EditorScreen(
             val bmp = if (showOriginal) originalBitmap else preview
             if (b == null || bmp == null) {
                 Button(onClick = {
-                    pickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
+                    pickerLauncher.launch(arrayOf("image/*"))
                 }) { Text(stringResource(R.string.open_photo)) }
             } else {
                 val inCrop = activeTool == EditorTool.CROP

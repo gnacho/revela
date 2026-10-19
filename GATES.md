@@ -118,3 +118,8 @@ Scope: FASE 11 completa en 5 paquetes ordenados: HOME (biblioteca de sesiones pe
   CHECK: ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && ./gradlew assembleRelease -q > /dev/null 2>&1 && python3 ~/temp/opencode-work/revela-gates/g21.py 2>&1 | tail -1
   EXPECT: NOTES_FILTERS_DELETE_OK
   EVIDENCE: ejecutado 19-Oct-2026 en emulador es-ES: chips de filtro visibles, nota guardada y mostrada, Con nota filtra, Con look con 1 sesion tras aplicar Calido, Todas restaura, dialogo de borrado de original con Cancelar. 109/109 tests JVM (3 nuevos: setNote+upsert conserva, indice antiguo sin note, hasLook).
+
+- [x] G22: Eliminar foto original borra de verdad el fichero (apertura por SAF con permiso de escritura y DocumentsContract.deleteDocument)
+  CHECK: ./gradlew testDebugUnitTest -q > /dev/null 2>&1 && ./gradlew assembleRelease -q > /dev/null 2>&1 && python3 ~/temp/opencode-work/revela-gates/g22.py 2>&1 | tail -1
+  EXPECT: DELETE_REAL_OK
+  EVIDENCE: ejecutado 19-Oct-2026 en emulador: se crea y empuja g22_delete_test.png, se abre por SAF, se confirma el borrado y el fichero desaparece del disco; la app sigue en el editor. El selector pasa de PickVisualMedia a OpenDocument con escritura (los URIs del Photo Picker son de solo lectura y el borrado fallaba en silencio; se muestra aviso delete_original_repick para sesiones antiguas). Banco completo G14/G15/G16/G18/G20/G21 reverificado con el nuevo selector.
