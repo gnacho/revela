@@ -2945,8 +2945,8 @@ fun EditorScreen(
                 animationSpec = tween(150, easing = FastOutSlowInEasing)
             ) + fadeOut(tween(150))
         ) {
-            // Panel de herramientas: fila de favoritos grande arriba y rejilla completa debajo
-            val catalog = toolCatalog()
+            // Panel de herramientas: solo la rejilla completa; la fila de favoritos
+            // grande que habia aqui se consideraba un bug (duplicaba la FavoritesBar)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2954,27 +2954,6 @@ fun EditorScreen(
                     .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(Ui.sheet)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    favorites.forEach { id ->
-                        val item = catalog.find { it.first.id == id } ?: return@forEach
-                        IconButton(
-                            onClick = {
-                                activeTool = item.first
-                                bottomTab = BottomTab.NONE
-                            },
-                            modifier = Modifier.size(50.dp)
-                        ) {
-                            Icon(item.second, stringResource(item.third), tint = Ui.icon, modifier = Modifier.size(38.dp))
-                        }
-                    }
-                }
                 ToolsGrid(
                     modifier = Modifier.fillMaxSize(),
                     favorites = favorites.toSet(),
@@ -4236,7 +4215,7 @@ fun ToolsGrid(
                                 Icon(
                                     icon, stringResource(label),
                                     tint = Ui.icon,
-                                    modifier = Modifier.size(26.dp)
+                                    modifier = Modifier.size(38.dp)
                                 )
                                 Text(
                                     stringResource(label),
@@ -4251,13 +4230,13 @@ fun ToolsGrid(
                                 onClick = { onToggleFavorite(tool.id) },
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
-                                    .size(26.dp)
+                                    .size(30.dp)
                             ) {
                                 Icon(
                                     if (fav) Icons.Filled.Star else Icons.Outlined.StarBorder,
                                     contentDescription = if (fav) stringResource(R.string.remove_from_favorites) else stringResource(R.string.add_to_favorites),
                                     tint = if (fav) Ui.accent else Ui.line,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
