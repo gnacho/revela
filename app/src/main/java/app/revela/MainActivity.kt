@@ -591,8 +591,6 @@ fun EditorScreen(
 
     // Navegacion estilo Snapseed
     var bottomTab by remember { mutableStateOf(BottomTab.NONE) }
-    // Herramientas: franja de favoritos por defecto; "Todas" despliega la rejilla completa
-    var toolsExpanded by remember { mutableStateOf(false) }
     var tuneParam by remember { mutableStateOf(TuneParam.EXPOSURE) }
     var paramMenuVisible by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
@@ -1294,9 +1292,8 @@ fun EditorScreen(
         // Solo HERRAMIENTAS (rejilla grande) reencuadra la foto; ESTILOS es una franja
         // del carrusel que no necesita empeñecer la foto (feedback del usuario).
         val toolsPanelOpen = activeTool == null && bottomTab == BottomTab.TOOLS && base != null
-        LaunchedEffect(bottomTab) { if (bottomTab != BottomTab.TOOLS) toolsExpanded = false }
         val photoFrac by animateFloatAsState(
-            targetValue = if (toolsPanelOpen && toolsExpanded) 0.3f else 1f,
+            targetValue = if (toolsPanelOpen) 0.3f else 1f,
             animationSpec = tween(280, easing = FastOutSlowInEasing),
             label = "photoFrac"
         )
@@ -2922,7 +2919,7 @@ fun EditorScreen(
         }
         // Velo sobre la foto solo con el panel de HERRAMIENTAS abierto; tocarlo cierra
         androidx.compose.animation.AnimatedVisibility(
-            visible = toolsPanelOpen && toolsExpanded,
+            visible = toolsPanelOpen,
             enter = fadeIn(tween(160)),
             exit = fadeOut(tween(120))
         ) {
@@ -2948,78 +2945,57 @@ fun EditorScreen(
                 animationSpec = tween(150, easing = FastOutSlowInEasing)
             ) + fadeOut(tween(150))
         ) {
-            if (toolsExpanded) {
-                Column(
+            // Panel de herramientas: fila de favoritos grande arriba y rejilla completa debajo
+            val catalog = toolCatalog()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.7f)
+                    .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                    .background(Ui.sheet)
+            ) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .fillMaxHeight(0.7f)
-                        .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-                        .background(Ui.sheet)
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ToolsGrid(
-                        modifier = Modifier.fillMaxSize(),
-                        favorites = favorites.toSet(),
-                        onToggleFavorite = { toggleFavorite(it) },
-                        onSelect = {
-                            activeTool = it
-                            bottomTab = BottomTab.NONE
-                            // volver a la franja al salir: no re-expandir la rejilla al aplicar
-                            toolsExpanded = false
-                        }
-                    )
-                }
-            } else {
-                // Franja de las mas comunes (los favoritos), MISMO tamano y estilo que la
-                // barra de favoritos: IconButton 50dp con icono 38dp.
-                val catalog = toolCatalog()
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                        .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-                        .background(Ui.sheet)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        favorites.forEach { id ->
-                            val item = catalog.find { it.first.id == id } ?: return@forEach
-                            IconButton(
-                                onClick = {
-                                    activeTool = item.first
-                                    bottomTab = BottomTab.NONE
-                                },
-                                modifier = Modifier.size(50.dp)
-                            ) {
-                                Icon(item.second, stringResource(item.third), tint = Ui.icon, modifier = Modifier.size(38.dp))
-                            }
-                        }
-                        IconButton(onClick = { toolsExpanded = true }, modifier = Modifier.size(50.dp)) {
-                            Icon(
-                                Icons.Outlined.Apps,
-                                stringResource(R.string.tools_all),
-                                tint = Ui.textDim,
-                                modifier = Modifier.size(38.dp)
-                            )
+                    favorites.forEach { id ->
+                        val item = catalog.find { it.first.id == id } ?: return@forEach
+                        IconButton(
+                            onClick = {
+                                activeTool = item.first
+                                bottomTab = BottomTab.NONE
+                            },
+                            modifier = Modifier.size(50.dp)
+                        ) {
+                            Icon(item.second, stringResource(item.third), tint = Ui.icon, modifier = Modifier.size(38.dp))
                         }
                     }
                 }
+                ToolsGrid(
+                    modifier = Modifier.fillMaxSize(),
+                    favorites = favorites.toSet(),
+                    onToggleFavorite = { toggleFavorite(it) },
+                    onSelect = {
+                        activeTool = it
+                        bottomTab = BottomTab.NONE
+                    }
+                )
             }
         }
         // Carrusel de estilos: sube por encima de la parte inferior de la foto.
-        // Muelle suave: el recorrido es corto y la rigidez alta se notaba brusca.
+        // Muelle aun mas suave: amortiguacion alta y rigidez baja para que el
+        // carrusel no suba y baje bruscamente.
         androidx.compose.animation.AnimatedVisibility(
             modifier = Modifier.align(Alignment.BottomCenter),
             visible = activeTool == null && bottomTab == BottomTab.LOOKS && base != null,
             enter = slideInVertically(
                 initialOffsetY = { it },
-                animationSpec = spring(dampingRatio = 0.9f, stiffness = 240f)
-            ) + fadeIn(tween(140)),
+                animationSpec = spring(dampingRatio = 0.95f, stiffness = 160f)
+            ) + fadeIn(tween(180)),
             exit = slideOutVertically(
                 targetOffsetY = { it },
                 animationSpec = tween(150, easing = FastOutSlowInEasing)
