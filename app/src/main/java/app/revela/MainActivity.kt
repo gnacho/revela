@@ -14,6 +14,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -1290,7 +1291,7 @@ fun EditorScreen(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize(tween(220, easing = FastOutSlowInEasing))
+                .animateContentSize(spring(dampingRatio = 0.85f, stiffness = 320f))
                 .then(
                     if (panelOpen) Modifier.height(200.dp)
                     else Modifier.weight(1f)
@@ -2918,13 +2919,13 @@ fun EditorScreen(
                 .weight(1f),
             visible = activeTool == null && bottomTab == BottomTab.TOOLS && base != null,
             enter = slideInVertically(
-                initialOffsetY = { it / 2 },
-                animationSpec = tween(220, easing = FastOutSlowInEasing)
-            ) + fadeIn(tween(220)),
+                initialOffsetY = { it },
+                animationSpec = spring(dampingRatio = 0.82f, stiffness = 380f)
+            ) + fadeIn(tween(140)),
             exit = slideOutVertically(
-                targetOffsetY = { it / 2 },
-                animationSpec = tween(180, easing = FastOutSlowInEasing)
-            ) + fadeOut(tween(180))
+                targetOffsetY = { it },
+                animationSpec = tween(150, easing = FastOutSlowInEasing)
+            ) + fadeOut(tween(150))
         ) {
             ToolsGrid(
                 modifier = Modifier
@@ -2945,13 +2946,13 @@ fun EditorScreen(
                 .weight(1f),
             visible = activeTool == null && bottomTab == BottomTab.LOOKS && base != null,
             enter = slideInVertically(
-                initialOffsetY = { it / 2 },
-                animationSpec = tween(220, easing = FastOutSlowInEasing)
-            ) + fadeIn(tween(220)),
+                initialOffsetY = { it },
+                animationSpec = spring(dampingRatio = 0.82f, stiffness = 380f)
+            ) + fadeIn(tween(140)),
             exit = slideOutVertically(
-                targetOffsetY = { it / 2 },
-                animationSpec = tween(180, easing = FastOutSlowInEasing)
-            ) + fadeOut(tween(180))
+                targetOffsetY = { it },
+                animationSpec = tween(150, easing = FastOutSlowInEasing)
+            ) + fadeOut(tween(150))
         ) {
             if (activeTool == null && base != null) {
             LooksCarousel(
@@ -2990,8 +2991,8 @@ fun EditorScreen(
         // deslizandose hacia abajo (issue #2: antes quedaba visible en Estilos).
         AnimatedVisibility(
             visible = activeTool == null && base != null && bottomTab == BottomTab.NONE,
-            exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(180, easing = FastOutSlowInEasing)) + fadeOut(tween(180)),
-            enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeIn(tween(220))
+            exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(150, easing = FastOutSlowInEasing)) + fadeOut(tween(150)),
+            enter = slideInVertically(initialOffsetY = { it }, animationSpec = spring(dampingRatio = 0.82f, stiffness = 380f)) + fadeIn(tween(140))
         ) {
             FavoritesBar(
                 favorites = favorites,
