@@ -174,7 +174,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Transform
 import androidx.compose.material.icons.filled.AspectRatio
@@ -493,6 +496,7 @@ fun EditorScreen(
     var showSettings by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var appSettings by remember { mutableStateOf(app.revela.core.SettingsStore.load(context.filesDir)) }
+    var showFavEditor by remember { mutableStateOf(false) }
     var cropDrawMode by remember { mutableStateOf(false) }
     var viewScale by remember { mutableFloatStateOf(1f) }
     var viewOffset by remember { mutableStateOf(Offset.Zero) }
@@ -1076,11 +1080,17 @@ fun EditorScreen(
                 }) { Icon(Icons.Outlined.Check, "Listo", tint = Ui.icon) }
             }
         }
+        // Con un panel abierto (Herramientas/Estilos) la foto sube como franja superior
+        // siempre visible; con herramienta activa o nada abierto, ocupa todo el espacio.
+        val panelOpen = activeTool == null && bottomTab != BottomTab.NONE && base != null
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .then(
+                    if (panelOpen) Modifier.height(200.dp)
+                    else Modifier.weight(1f)
+                )
+                .padding(horizontal = 16.dp, vertical = if (panelOpen) 8.dp else 14.dp),
             contentAlignment = Alignment.Center
         ) {
             val density = LocalDensity.current
@@ -1684,46 +1694,8 @@ fun EditorScreen(
                 }
             }
 
-                // Velo oscuro sobre la foto mientras el panel esta abierto (la foto sigue visible)
-                val toolsOpen = activeTool == null && bottomTab == BottomTab.TOOLS && base != null
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = toolsOpen,
-                    enter = fadeIn(animationSpec = tween(150)),
-                    exit = fadeOut(animationSpec = tween(150)),
-                    modifier = Modifier.matchParentSize()
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.2f))
-                            .pointerInput(Unit) {
-                                detectTapGestures { bottomTab = BottomTab.NONE }
-                            }
-                    )
-                }
-                // Panel de herramientas: sube desde abajo ~250 ms (patron Snapseed medido)
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = toolsOpen,
-                    enter = slideInVertically(
-                        animationSpec = tween(250, easing = FastOutSlowInEasing),
-                        initialOffsetY = { it }
-                    ),
-                    exit = slideOutVertically(
-                        animationSpec = tween(200, easing = FastOutSlowInEasing),
-                        targetOffsetY = { it }
-                    ),
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                ) {
-                    ToolsGrid(
-                        modifier = Modifier.fillMaxWidth(),
-                        favorites = favorites.toSet(),
-                        onToggleFavorite = { toggleFavorite(it) },
-                        onSelect = {
-                            activeTool = it
-                            bottomTab = BottomTab.NONE
-                        }
-                    )
-                }
+                // El panel ya NO solapa la foto: la foto sube como franja superior y la
+                // rejilla ocupa el espacio inferior real (patron Snapseed).
             // Indicador fino flotando sobre la foto (nunca la encoje)
             Box(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
             // Indicador de valor fino estilo Snapseed (etiqueta + valor + linea con punto)
@@ -1802,38 +1774,7 @@ fun EditorScreen(
                     }
                 }
             }
-            // Ventana de imagen (siempre visible) + overlay de herramientas (patron Snapseed:
-            }
-            // Carrusel de estilos como overlay inferior (la foto no cambia de tamano)
-            if (bottomTab == BottomTab.LOOKS && activeTool == null && base != null) {
-                Box(Modifier.align(Alignment.BottomCenter)) {
-                                        LooksCarousel(
-                                            thumbs = lookThumbs,
-                                            selectedId = stack.edits.filterIsInstance<Edit.Look>().lastOrNull()?.id ?: "none",
-                                            onSelect = { look ->
-                                                if (look.id == "none") stack.removeTool(Tool.LOOK)
-                                                else stack.apply(Edit.Look(look.id))
-                                                stackVersion++
-                                                persistSession()
-                                            },
-                                            customStyles = customStyles,
-                                            customThumbs = customThumbs,
-                                            selectedCustomId = selectedCustomId,
-                                            onSelectCustom = { cs ->
-                                                runCatching { EditStack.fromJson(cs.editsJson) }.getOrNull()?.let { st ->
-                                                    stack = st
-                                                    selectedCustomId = cs.id
-                                                    stackVersion++
-                                                    persistSession()
-                                                }
-                                            },
-                                            onDeleteCustom = { deleteStyle = it },
-                                            onSaveNew = {
-                                                styleName = ""
-                                                showStyleNameDialog = true
-                                            }
-                                        )
-                }
+            // Ventana de imagen (siempre visible); paneles abiertos van en espacio real bajo la franja
             }
             // Paneles de herramienta como overlay inferior
             if (activeTool != null) {
@@ -2765,13 +2706,57 @@ fun EditorScreen(
                 }
             }
         }
+        // Panel de herramientas en ESPACIO REAL bajo la franja de la foto (no solapa)
+        if (activeTool == null && bottomTab == BottomTab.TOOLS && base != null) {
+            ToolsGrid(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                favorites = favorites.toSet(),
+                onToggleFavorite = { toggleFavorite(it) },
+                onSelect = {
+                    activeTool = it
+                    bottomTab = BottomTab.NONE
+                }
+            )
+        }
+        // Carrusel de estilos en espacio real bajo la franja de la foto
+        if (activeTool == null && bottomTab == BottomTab.LOOKS && base != null) {
+            LooksCarousel(
+                thumbs = lookThumbs,
+                selectedId = stack.edits.filterIsInstance<Edit.Look>().lastOrNull()?.id ?: "none",
+                onSelect = { look ->
+                    if (look.id == "none") stack.removeTool(Tool.LOOK)
+                    else stack.apply(Edit.Look(look.id))
+                    stackVersion++
+                    persistSession()
+                },
+                customStyles = customStyles,
+                customThumbs = customThumbs,
+                selectedCustomId = selectedCustomId,
+                onSelectCustom = { cs ->
+                    runCatching { EditStack.fromJson(cs.editsJson) }.getOrNull()?.let { st ->
+                        stack = st
+                        selectedCustomId = cs.id
+                        stackVersion++
+                        persistSession()
+                    }
+                },
+                onDeleteCustom = { deleteStyle = it },
+                onSaveNew = {
+                    styleName = ""
+                    showStyleNameDialog = true
+                }
+            )
+        }
         if (activeTool == null && base != null) {
             FavoritesBar(
                 favorites = favorites,
                 onSelect = {
                     activeTool = it
                     bottomTab = BottomTab.NONE
-                }
+                },
+                onEdit = { showFavEditor = true }
             )
         }
         // Barra de pestañas fija (la foto nunca cambia de altura al abrir paneles)
@@ -2936,6 +2921,60 @@ fun EditorScreen(
             },
             dismissButton = {
                 OutlinedButton(onClick = { showSettings = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    // Editor de la barra de favoritos: lista completa con marcas
+    if (showFavEditor) {
+        AlertDialog(
+            onDismissRequest = { showFavEditor = false },
+            title = { Text("Barra de herramientas") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 4.dp)
+                ) {
+                    Text(
+                        "Elige las herramientas que ves debajo de la foto.",
+                        fontSize = 13.sp,
+                        color = Ui.textDim
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    toolCatalog().forEach { (tool, icon, label) ->
+                        val fav = tool.id in favorites
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { toggleFavorite(tool.id) }
+                                .padding(vertical = 6.dp)
+                        ) {
+                            Icon(
+                                icon, label,
+                                tint = if (fav) Ui.accent else Ui.line,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                label,
+                                fontSize = 14.sp,
+                                color = if (fav) Ui.text else Ui.textDim,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                if (fav) Icons.Filled.CheckBox else Icons.Outlined.CheckBoxOutlineBlank,
+                                contentDescription = if (fav) "Quitar" else "Anadir",
+                                tint = if (fav) Ui.accent else Ui.line,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showFavEditor = false }) { Text("Listo") }
             }
         )
     }
@@ -3600,11 +3639,12 @@ fun toolCatalog(): List<Triple<EditorTool, androidx.compose.ui.graphics.vector.I
     Triple(EditorTool.FRAME, Icons.Outlined.CropFree, "Marcos")
 )
 
-/** Barra de favoritos personalizable: iconos de las herramientas elegidas, siempre bajo la barra superior. */
+/** Barra de favoritos personalizable: iconos de las herramientas elegidas + acceso al editor de la barra. */
 @Composable
 fun FavoritesBar(
     favorites: List<String>,
-    onSelect: (EditorTool) -> Unit
+    onSelect: (EditorTool) -> Unit,
+    onEdit: () -> Unit
 ) {
     if (favorites.isEmpty()) return
     val catalog = toolCatalog()
@@ -3622,6 +3662,9 @@ fun FavoritesBar(
                 Icon(item.second, item.third, tint = Ui.icon)
             }
         }
+        IconButton(onClick = onEdit, modifier = Modifier.size(44.dp)) {
+            Icon(Icons.Outlined.Edit, "Personalizar barra de herramientas", tint = Ui.textDim)
+        }
     }
 }
 
@@ -3637,7 +3680,6 @@ fun ToolsGrid(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .fillMaxHeight(0.6f)
             .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
             .background(Ui.sheet)
     ) {
@@ -3645,7 +3687,7 @@ fun ToolsGrid(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 6.dp, vertical = 14.dp)
+                .padding(horizontal = 6.dp, vertical = 10.dp)
         ) {
             tools.chunked(5).forEach { rowTools ->
                 Row(
@@ -3661,39 +3703,39 @@ fun ToolsGrid(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
                                     .clickable { onSelect(tool) }
-                                    .padding(vertical = 12.dp)
+                                    .padding(vertical = 8.dp)
                             ) {
                                 Icon(
                                     icon, label,
                                     tint = Ui.icon,
-                                    modifier = Modifier.size(30.dp)
+                                    modifier = Modifier.size(26.dp)
                                 )
                                 Text(
                                     label,
                                     color = Ui.textDim,
-                                    fontSize = 11.sp,
-                                    lineHeight = 13.sp,
+                                    fontSize = 10.sp,
+                                    lineHeight = 12.sp,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    modifier = Modifier.padding(top = 8.dp)
+                                    modifier = Modifier.padding(top = 6.dp)
                                 )
                             }
                             IconButton(
                                 onClick = { onToggleFavorite(tool.id) },
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
-                                    .size(28.dp)
+                                    .size(26.dp)
                             ) {
                                 Icon(
                                     if (fav) Icons.Filled.Star else Icons.Outlined.StarBorder,
                                     contentDescription = if (fav) "Quitar de favoritos" else "Anadir a favoritos",
                                     tint = if (fav) Ui.accent else Ui.line,
-                                    modifier = Modifier.size(15.dp)
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(4.dp))
             }
         }
     }
