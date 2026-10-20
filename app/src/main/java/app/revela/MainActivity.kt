@@ -113,6 +113,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -1080,7 +1081,19 @@ fun EditorScreen(
                 .background(Ui.bg)
                 .statusBarsPadding()
         ) {
-            // Barra superior
+            // Barra superior: se oculta suavemente SOLO con el cajon de Herramientas
+            // abierto (con Estilos sigue visible); reaparece igual al cerrar el cajon
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !(activeTool == null && bottomTab == BottomTab.TOOLS && base != null),
+                enter = fadeIn(tween(150)) + slideInVertically(
+                    initialOffsetY = { -it / 2 },
+                    animationSpec = tween(150, easing = FastOutSlowInEasing)
+                ),
+                exit = fadeOut(tween(150)) + slideOutVertically(
+                    targetOffsetY = { -it / 2 },
+                    animationSpec = tween(150, easing = FastOutSlowInEasing)
+                )
+            ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1285,9 +1298,10 @@ fun EditorScreen(
                 }) { Icon(Icons.Outlined.Check, stringResource(R.string.done), tint = Ui.icon) }
             }
         }
+        }
         // La foto SIEMPRE esta completa y visible: sin panel ocupa toda la caja; con el panel
         // abierto se reencuadra suavemente en la zona de encima del panel (patron Snapseed,
-        // issue #2). El panel sube por debajo con un velo.
+        // issue #2). El panel sube por debajo.
         val panelOpen = activeTool == null && bottomTab != BottomTab.NONE && base != null
         // Solo HERRAMIENTAS (rejilla grande) reencuadra la foto; ESTILOS es una franja
         // del carrusel que no necesita empeñecer la foto (feedback del usuario).
@@ -2917,18 +2931,14 @@ fun EditorScreen(
                 }
             }
         }
-        // Velo sobre la foto solo con el panel de HERRAMIENTAS abierto; tocarlo cierra
-        androidx.compose.animation.AnimatedVisibility(
-            visible = toolsPanelOpen,
-            enter = fadeIn(tween(160)),
-            exit = fadeOut(tween(120))
-        ) {
-            // fillMaxSize (NO matchParentSize: dentro de AnimatedVisibility el scope no es
-            // BoxScope y matchParentSize es un no-op de 0x0)
+        // Sin velo: la foto queda a brillo normal con el cajon abierto. Para cerrar basta
+        // tocar la zona de la foto visible (tap fuera del panel, como hacia el velo antes)
+        if (toolsPanelOpen) {
+            // fillMaxSize: cubre la caja de la foto y la zona por donde sube el panel;
+            // el propio panel se dibuja despues y sigue recibiendo sus toques
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0x59000000))
                     .clickable { bottomTab = BottomTab.NONE }
             )
         }
@@ -2980,10 +2990,13 @@ fun EditorScreen(
             ) + fadeOut(tween(150))
         ) {
             if (activeTool == null && base != null) {
+            // Altura FIJA (no depende del contenido): con looks custom o miniaturas
+            // async el strip mide lo mismo en el frame 1 y en el final; sin esto el
+            // wrapContentHeight "saltaba" a mitad de la animacion (rebote raro)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .wrapContentHeight()
+                    .height(104.dp)
                     .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(Ui.sheet)
             ) {
@@ -4324,6 +4337,8 @@ fun LooksCarousel(
                     stringResource(look.labelRes),
                     color = if (sel) Ui.text else Ui.textDim,
                     fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
@@ -4398,6 +4413,8 @@ fun LooksCarousel(
                     cs.name,
                     color = if (sel) Ui.accent else Color.Gray,
                     fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
@@ -4422,6 +4439,8 @@ fun LooksCarousel(
                 stringResource(R.string.save),
                 color = Ui.textDim,
                 fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 4.dp)
             )
         }
