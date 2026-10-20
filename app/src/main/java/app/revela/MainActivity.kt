@@ -130,9 +130,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -1193,30 +1192,21 @@ fun EditorScreen(
                             .absoluteOffset(offsetXdp, offsetYdp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Reencuadre suave SOLO con Herramientas: la imagen conserva su
-                        // tamano, posicion y escala; solo se recorta el dibujo por abajo
-                        // (clipRect a photoFrac), anclado arriba. La caja y las franjas
-                        // no se mueven; la zona baja vacia queda detras del panel.
+                        // Reencuadre suave SOLO con Herramientas: la foto se encoge
+                        // escalada por photoFrac con anclaje arriba-centro (borde
+                        // superior fijo, la zona baja queda vacia detras del panel,
+                        // sin recortar contenido).
                         Image(
                             bitmap = bmp.asImageBitmap(),
                             contentDescription = null,
                             contentScale = ContentScale.FillBounds,
                             modifier = Modifier
                                 .requiredSize(imgWdp, imgHdp)
-                                .drawWithContent {
-                                    clipRect(
-                                        left = 0f,
-                                        top = 0f,
-                                        right = size.width,
-                                        bottom = size.height * photoFrac
-                                    ) {
-                                        this@drawWithContent.drawContent()
-                                    }
-                                }
                                 .graphicsLayer {
                                     rotationZ = g.totalRotationDeg
-                                    scaleX = cover
-                                    scaleY = cover
+                                    scaleX = cover * photoFrac
+                                    scaleY = cover * photoFrac
+                                    transformOrigin = TransformOrigin(0.5f, 0f)
                                 }
                         )
                     }
