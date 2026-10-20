@@ -129,9 +129,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
@@ -1081,9 +1083,16 @@ fun EditorScreen(
                 .background(Ui.bg)
                 .statusBarsPadding()
         ) {
-        // Sin reencuadre: la foto nunca se mueve. El panel y la barra de favoritos suben
-        // por debajo, pegados a las pestanas.
         val toolsPanelOpen = activeTool == null && bottomTab == BottomTab.TOOLS && base != null
+        // Reencuadre suave SOLO con el cajon de Herramientas: la foto (solo la imagen
+        // dentro de la caja, no la caja ni las franjas) se encoge un poco y sube, y la
+        // zona baja vacia queda detras del panel. Con Estilos o la barra de favoritos
+        // la foto no se mueve (target 1f).
+        val photoFrac by animateFloatAsState(
+            targetValue = if (toolsPanelOpen) 0.8f else 1f,
+            animationSpec = tween(280, easing = FastOutSlowInEasing),
+            label = "photoFrac"
+        )
         Box(modifier = Modifier.weight(1f)) {
         BoxWithConstraints(
             modifier = Modifier
@@ -1184,12 +1193,26 @@ fun EditorScreen(
                             .absoluteOffset(offsetXdp, offsetYdp),
                         contentAlignment = Alignment.Center
                     ) {
+                        // Reencuadre suave SOLO con Herramientas: la imagen conserva su
+                        // tamano, posicion y escala; solo se recorta el dibujo por abajo
+                        // (clipRect a photoFrac), anclado arriba. La caja y las franjas
+                        // no se mueven; la zona baja vacia queda detras del panel.
                         Image(
                             bitmap = bmp.asImageBitmap(),
                             contentDescription = null,
                             contentScale = ContentScale.FillBounds,
                             modifier = Modifier
                                 .requiredSize(imgWdp, imgHdp)
+                                .drawWithContent {
+                                    clipRect(
+                                        left = 0f,
+                                        top = 0f,
+                                        right = size.width,
+                                        bottom = size.height * photoFrac
+                                    ) {
+                                        this@drawWithContent.drawContent()
+                                    }
+                                }
                                 .graphicsLayer {
                                     rotationZ = g.totalRotationDeg
                                     scaleX = cover
@@ -2777,7 +2800,8 @@ fun EditorScreen(
                     .fillMaxWidth()
                     .height(104.dp)
                     .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-                    .background(Ui.sheet)
+                    .background(Ui.sheet),
+                verticalArrangement = Arrangement.Bottom
             ) {
                 Box(modifier = Modifier.fillMaxWidth().wrapContentHeight()) {
                     LooksCarousel(
@@ -2827,12 +2851,15 @@ fun EditorScreen(
             enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeIn(tween(140))
         ) {
             // Altura fija igual que el carrusel (104.dp) y fondo solido: ocupa exactamente
-            // la banda que cede al carrusel, sin reubicar la foto
+            // la banda que cede al carrusel, sin reubicar la foto.
+            // El contenido va pegado ABAJO: el aire interior arriba es indistinguible del
+            // fondo y la fila de iconos queda tocando el menu de pestanas (sin hueco visible).
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(104.dp)
-                    .background(Ui.bg)
+                    .background(Ui.bg),
+                verticalArrangement = Arrangement.Bottom
             ) {
                 FavoritesBar(
                     favorites = favorites,
