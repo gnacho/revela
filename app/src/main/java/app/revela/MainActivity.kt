@@ -42,7 +42,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
-
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
@@ -2957,10 +2957,16 @@ fun EditorScreen(
         ) {
             // Panel de herramientas: solo la rejilla completa; la fila de favoritos
             // grande que habia aqui se consideraba un bug (duplicaba la FavoritesBar)
+            // Altura de CONTENIDO limitada a 4 filas de la rejilla (celda = 8+26+6+12+8 = 60.dp,
+            // mas spacer de 4.dp por fila y padding vertical de 10.dp); las 28 herramientas
+            // siguen alcanzables con el scroll interno de la rejilla
+            val toolsRowH = 60.dp
+            val toolsPanelMaxH = 10.dp + toolsRowH * 4 + 4.dp * 4
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.7f)
+                    .wrapContentHeight()
+                    .heightIn(max = toolsPanelMaxH)
                     .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(Ui.sheet)
             ) {
@@ -3038,22 +3044,33 @@ fun EditorScreen(
             }
             }
         }
-        }
-        // La barra de favoritos solo vive sin paneles: al abrir Estilos/Herramientas se va
-        // deslizandose hacia abajo (issue #2: antes quedaba visible en Estilos).
-        AnimatedVisibility(
+        // Franja de favoritos SUPERPUESTA a la foto (misma banda que el carrusel de Estilos):
+        // al abrir Estilos/Herramientas se desliza abajo y en su lugar sube el panel, EN LA
+        // MISMA BANDA; la foto no cambia de tamano ni de posicion ni un pixel (issue #2).
+        androidx.compose.animation.AnimatedVisibility(
+            modifier = Modifier.align(Alignment.BottomCenter),
             visible = activeTool == null && base != null && bottomTab == BottomTab.NONE,
             exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(150, easing = FastOutSlowInEasing)) + fadeOut(tween(150)),
             enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeIn(tween(140))
         ) {
-            FavoritesBar(
-                favorites = favorites,
-                onSelect = {
-                    activeTool = it
-                    bottomTab = BottomTab.NONE
-                },
-                onEdit = { showFavEditor = true }
-            )
+            // Altura fija igual que el carrusel (104.dp) y fondo solido: ocupa exactamente
+            // la banda que cede al carrusel, sin reubicar la foto
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(104.dp)
+                    .background(Ui.bg)
+            ) {
+                FavoritesBar(
+                    favorites = favorites,
+                    onSelect = {
+                        activeTool = it
+                        bottomTab = BottomTab.NONE
+                    },
+                    onEdit = { showFavEditor = true }
+                )
+            }
+        }
         }
         // Barra de pestañas fija (la foto nunca cambia de altura al abrir paneles)
         if (activeTool == null) {
