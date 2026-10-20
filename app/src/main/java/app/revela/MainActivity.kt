@@ -131,7 +131,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -1083,15 +1082,10 @@ fun EditorScreen(
                 .statusBarsPadding()
         ) {
         val toolsPanelOpen = activeTool == null && bottomTab == BottomTab.TOOLS && base != null
-        // Reencuadre suave SOLO con el cajon de Herramientas: la foto (solo la imagen
-        // dentro de la caja, no la caja ni las franjas) se encoge un poco y sube, y la
-        // zona baja vacia queda detras del panel. Con Estilos o la barra de favoritos
-        // la foto no se mueve (target 1f).
-        val photoFrac by animateFloatAsState(
-            targetValue = if (toolsPanelOpen) 0.8f else 1f,
-            animationSpec = tween(280, easing = FastOutSlowInEasing),
-            label = "photoFrac"
-        )
+        // Traslacion suave SOLO con el cajon de Herramientas: la foto SUBE sin
+        // cambiar de tamano hasta quedar ~10px (reales) por encima del borde
+        // superior del cajon. Con Estilos o la barra de favoritos no se mueve
+        // (target 0). El calculo de la traslacion esta junto a la imagen.
         Box(modifier = Modifier.weight(1f)) {
         BoxWithConstraints(
             modifier = Modifier
@@ -1186,16 +1180,44 @@ fun EditorScreen(
                             }
                         }
                 ) {
+                    // Traslacion del cajon de Herramientas (termino aditivo, separado
+                    // del pan del usuario): la foto (centrada verticalmente en la caja)
+                    // sube lo justo para quedar ~10px reales por encima del borde
+                    // superior del panel, sin escalarla y sin pasarse del padding
+                    // superior. Ajustar la separacion en fotoCajonMargenPx.
+                    val fotoCajonMargenPx = 10 // separacion foto-cajon en px reales de pantalla
+                    val toolsPanelHdp = 10.dp + 60.dp * 4 + 4.dp * 4 // mantener en sync con toolsPanelMaxH del panel
+                    val imgHpxCalc = with(density) { imgHdp.toPx() }
+                    val panelHpx = with(density) { toolsPanelHdp.toPx() }
+                    val padVpx = with(density) { 14.dp.toPx() }
+                    val bottomImgPx = (viewportHpx + imgHpxCalc) / 2f
+                    // El panel se alinea al BottomCenter del Box PADRE (sin el padding
+                    // vertical de 14.dp de esta caja), asi que su borde superior en
+                    // coords de esta caja esta una vez padV mas arriba de lo naive.
+                    val panelTopPx = viewportHpx - panelHpx + padVpx
+                    val topImgPx = (viewportHpx - imgHpxCalc) / 2f
+                    val margenPx = with(density) { fotoCajonMargenPx.toDp().toPx() }
+                    val rawShiftPx = (bottomImgPx - panelTopPx + margenPx).coerceAtLeast(0f)
+                    val maxShiftPx = (topImgPx - padVpx).coerceAtLeast(0f)
+                    val targetShiftDp = with(density) {
+                        rawShiftPx.coerceAtMost(maxShiftPx).toDp()
+                    }
+                    val panelShiftDp by animateDpAsState(
+                        targetValue = if (toolsPanelOpen) targetShiftDp else 0.dp,
+                        animationSpec = tween(280, easing = FastOutSlowInEasing),
+                        label = "panelShift"
+                    )
+                    val panelShiftPx = with(density) { panelShiftDp.toPx() }
+
                     Box(
                         modifier = Modifier
                             .requiredSize(frameWdp, frameHdp)
-                            .absoluteOffset(offsetXdp, offsetYdp),
+                            .absoluteOffset(offsetXdp, offsetYdp)
+                            .graphicsLayer { translationY = -panelShiftPx },
                         contentAlignment = Alignment.Center
                     ) {
-                        // Reencuadre suave SOLO con Herramientas: la foto se encoge
-                        // escalada por photoFrac con anclaje arriba-centro (borde
-                        // superior fijo, la zona baja queda vacia detras del panel,
-                        // sin recortar contenido).
+                        // La foto NO se escala con el cajon: solo se traslada (la
+                        // translationY aditiva va en el contenedor). Escala = cover.
                         Image(
                             bitmap = bmp.asImageBitmap(),
                             contentDescription = null,
@@ -1204,9 +1226,8 @@ fun EditorScreen(
                                 .requiredSize(imgWdp, imgHdp)
                                 .graphicsLayer {
                                     rotationZ = g.totalRotationDeg
-                                    scaleX = cover * photoFrac
-                                    scaleY = cover * photoFrac
-                                    transformOrigin = TransformOrigin(0.5f, 0f)
+                                    scaleX = cover
+                                    scaleY = cover
                                 }
                         )
                     }
