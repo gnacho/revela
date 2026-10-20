@@ -1081,242 +1081,15 @@ fun EditorScreen(
                 .background(Ui.bg)
                 .statusBarsPadding()
         ) {
-            // Barra superior: se oculta suavemente SOLO con el cajon de Herramientas
-            // abierto (con Estilos sigue visible); reaparece igual al cerrar el cajon
-            androidx.compose.animation.AnimatedVisibility(
-                visible = !(activeTool == null && bottomTab == BottomTab.TOOLS && base != null),
-                enter = fadeIn(tween(150)) + slideInVertically(
-                    initialOffsetY = { -it / 2 },
-                    animationSpec = tween(150, easing = FastOutSlowInEasing)
-                ),
-                exit = fadeOut(tween(150)) + slideOutVertically(
-                    targetOffsetY = { -it / 2 },
-                    animationSpec = tween(150, easing = FastOutSlowInEasing)
-                )
-            ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = {
-                thumbJob?.cancel()
-                scope.launch {
-                    persistSession()
-                    thumbJob?.cancel()
-                    flushThumb()
-                    onHome()
-                }
-            }) { Icon(Icons.Outlined.Home, stringResource(R.string.back_to_library), tint = Ui.icon) }
-            TextButton(onClick = {
-                pickerLauncher.launch("image/*")
-            }) {
-                Text(
-                    stringResource(R.string.open),
-                    color = Ui.textDim,
-                    fontSize = 16.sp,
-                    letterSpacing = 1.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-            Spacer(Modifier.weight(1f))
-
-            if (activeTool == null) {
-                IconButton(
-                    onClick = {
-                        if (stack.undo()) {
-                            stackVersion++
-                            persistSession()
-                        }
-                    },
-                    enabled = stack.canUndo
-                ) { Icon(Icons.AutoMirrored.Outlined.Undo, stringResource(R.string.undo), tint = Ui.icon) }
-                IconButton(
-                    onClick = {
-                        if (stack.redo()) {
-                            stackVersion++
-                            persistSession()
-                        }
-                    },
-                    enabled = stack.canRedo
-                ) { Icon(Icons.AutoMirrored.Outlined.Redo, stringResource(R.string.redo), tint = Ui.icon) }
-                IconButton(
-                    onClick = {},
-                    modifier = Modifier.pointerInput(sourceUri) {
-                        detectTapGestures(
-                            onPress = {
-                                showOriginal = true
-                                tryAwaitRelease()
-                                showOriginal = false
-                            }
-                        )
-                    }
-                ) { Icon(Icons.Outlined.Visibility, stringResource(R.string.compare_original), tint = Ui.icon) }
-                Box {
-                    IconButton(
-                        onClick = { showMenu = true },
-                        enabled = sourceUri != null
-                    ) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.menu), tint = Ui.icon) }
-                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.image_details)) },
-                            onClick = {
-                                showMenu = false
-                                showImageDetails = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.note_menu)) },
-                            onClick = {
-                                showMenu = false
-                                val u = sourceUri
-                                noteText = if (u != null) {
-                                    val id = SessionIndexStore.idFor(u.toString())
-                                    SessionIndexStore.list(context.filesDir)
-                                        .firstOrNull { it.id == id }?.note ?: ""
-                                } else ""
-                                showNote = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.layers_menu)) },
-                            onClick = {
-                                showMenu = false
-                                showLayers = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.revert_all)) },
-                            onClick = {
-                                showMenu = false
-                                showRevertConfirm = true
-                            },
-                            enabled = stack.edits.isNotEmpty() || geometry != GeometryModel()
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.settings)) },
-                            onClick = {
-                                showMenu = false
-                                showSettings = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.about)) },
-                            onClick = {
-                                showMenu = false
-                                showAbout = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(R.string.delete_original),
-                                    color = Color(0xFFD32F2F)
-                                )
-                            },
-                            onClick = {
-                                showMenu = false
-                                showDeleteOriginal = true
-                            }
-                        )
-                    }
-                }
-            } else {
-                // Consejo de la herramienta activa (patron Snapseed: la ayuda vive en la barra)
-                // Idioma efectivo (no el ajuste "system"): el consejo debe seguir al que se ve en pantalla
-                val tipLang = context.resources.configuration.locales[0].language
-                val activeTip = activeTool?.let { Tutorials.tipFor(it.id, tipLang) }
-                if (activeTip != null) {
-                    IconButton(onClick = { showTip = activeTip }) {
-                        Icon(Icons.Outlined.HelpOutline, stringResource(R.string.tool_tip), tint = Ui.icon)
-                    }
-                }
-                IconButton(onClick = {
-                    activeTool = null
-                    workingAdj = null
-                    workingGeometry = null
-                    workingPoint = null
-                    activePoint = -1
-                    dragValue = Float.NaN
-                    workingVignette = Float.NaN
-                    strokeX.clear()
-                    strokeY.clear()
-                    workingEdit = null
-                    workingPresetIntensity = Float.NaN
-                }) { Icon(Icons.Outlined.Close, stringResource(R.string.close_tool), tint = Ui.icon) }
-                IconButton(onClick = {
-                    when (activeTool) {
-                        EditorTool.CROP -> {
-                            workingGeometry?.let {
-                                geometry = it
-                                persistSession()
-                            }
-                        }
-                        EditorTool.SELECTIVE -> {
-                            val wp = workingPoint
-                            if (wp != null && activePoint >= 0) {
-                                stack.updateSelectivePoint(activePoint, wp)
-                                stackVersion++
-                                persistSession()
-                            }
-                        }
-                        EditorTool.PERSPECTIVE -> {
-                            (workingEdit as? Edit.Perspective)?.let {
-                                stack.apply(it)
-                                stackVersion++
-                                persistSession()
-                            }
-                        }
-                        EditorTool.EXPAND -> {
-                            (workingEdit as? Edit.Expand)?.let {
-                                stack.apply(it)
-                                stackVersion++
-                                persistSession()
-                            }
-                        }
-                        EditorTool.HEAD_POSE -> {
-                            (workingEdit as? Edit.HeadPose)?.let {
-                                stack.apply(it)
-                                stackVersion++
-                                persistSession()
-                            }
-                        }
-                        EditorTool.BRUSH -> {
-                            strokeX.clear()
-                            strokeY.clear()
-                        }
-                        else -> {}
-                    }
-                    workingAdj = null
-                    workingGeometry = null
-                    workingPoint = null
-                    activePoint = -1
-                    activeTool = null
-                    workingEdit = null
-                    workingPresetIntensity = Float.NaN
-                }) { Icon(Icons.Outlined.Check, stringResource(R.string.done), tint = Ui.icon) }
-            }
-        }
-        }
-        // La foto SIEMPRE esta completa y visible: sin panel ocupa toda la caja; con el panel
-        // abierto se reencuadra suavemente en la zona de encima del panel (patron Snapseed,
-        // issue #2). El panel sube por debajo.
-        val panelOpen = activeTool == null && bottomTab != BottomTab.NONE && base != null
-        // Solo HERRAMIENTAS (rejilla grande) reencuadra la foto; ESTILOS es una franja
-        // del carrusel que no necesita empeñecer la foto (feedback del usuario).
+        // Sin reencuadre: la foto nunca se mueve. El panel y la barra de favoritos suben
+        // por debajo, pegados a las pestanas.
         val toolsPanelOpen = activeTool == null && bottomTab == BottomTab.TOOLS && base != null
-        val photoFrac by animateFloatAsState(
-            targetValue = if (toolsPanelOpen) 0.3f else 1f,
-            animationSpec = tween(280, easing = FastOutSlowInEasing),
-            label = "photoFrac"
-        )
         Box(modifier = Modifier.weight(1f)) {
         BoxWithConstraints(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .fillMaxHeight(photoFrac)
+                .fillMaxHeight()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -3088,6 +2861,230 @@ fun EditorScreen(
                                 )
             }
         }
+        }
+
+        // Barra superior como overlay: ocultarse ya no reencuadra la foto
+        // Barra superior: se oculta suavemente SOLO con el cajon de Herramientas
+        // abierto (con Estilos sigue visible); reaparece igual al cerrar el cajon
+        androidx.compose.animation.AnimatedVisibility(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .statusBarsPadding(),
+            visible = !(activeTool == null && bottomTab == BottomTab.TOOLS && base != null),
+            enter = fadeIn(tween(150)) + slideInVertically(
+                initialOffsetY = { -it / 2 },
+                animationSpec = tween(150, easing = FastOutSlowInEasing)
+            ),
+            exit = fadeOut(tween(150)) + slideOutVertically(
+                targetOffsetY = { -it / 2 },
+                animationSpec = tween(150, easing = FastOutSlowInEasing)
+            )
+        ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = {
+            thumbJob?.cancel()
+            scope.launch {
+                persistSession()
+                thumbJob?.cancel()
+                flushThumb()
+                onHome()
+            }
+        }) { Icon(Icons.Outlined.Home, stringResource(R.string.back_to_library), tint = Ui.icon) }
+        TextButton(onClick = {
+            pickerLauncher.launch("image/*")
+        }) {
+            Text(
+                stringResource(R.string.open),
+                color = Ui.textDim,
+                fontSize = 16.sp,
+                letterSpacing = 1.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+        Spacer(Modifier.weight(1f))
+
+        if (activeTool == null) {
+            IconButton(
+                onClick = {
+                    if (stack.undo()) {
+                        stackVersion++
+                        persistSession()
+                    }
+                },
+                enabled = stack.canUndo
+            ) { Icon(Icons.AutoMirrored.Outlined.Undo, stringResource(R.string.undo), tint = Ui.icon) }
+            IconButton(
+                onClick = {
+                    if (stack.redo()) {
+                        stackVersion++
+                        persistSession()
+                    }
+                },
+                enabled = stack.canRedo
+            ) { Icon(Icons.AutoMirrored.Outlined.Redo, stringResource(R.string.redo), tint = Ui.icon) }
+            IconButton(
+                onClick = {},
+                modifier = Modifier.pointerInput(sourceUri) {
+                    detectTapGestures(
+                        onPress = {
+                            showOriginal = true
+                            tryAwaitRelease()
+                            showOriginal = false
+                        }
+                    )
+                }
+            ) { Icon(Icons.Outlined.Visibility, stringResource(R.string.compare_original), tint = Ui.icon) }
+            Box {
+                IconButton(
+                    onClick = { showMenu = true },
+                    enabled = sourceUri != null
+                ) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.menu), tint = Ui.icon) }
+                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.image_details)) },
+                        onClick = {
+                            showMenu = false
+                            showImageDetails = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.note_menu)) },
+                        onClick = {
+                            showMenu = false
+                            val u = sourceUri
+                            noteText = if (u != null) {
+                                val id = SessionIndexStore.idFor(u.toString())
+                                SessionIndexStore.list(context.filesDir)
+                                    .firstOrNull { it.id == id }?.note ?: ""
+                            } else ""
+                            showNote = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.layers_menu)) },
+                        onClick = {
+                            showMenu = false
+                            showLayers = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.revert_all)) },
+                        onClick = {
+                            showMenu = false
+                            showRevertConfirm = true
+                        },
+                        enabled = stack.edits.isNotEmpty() || geometry != GeometryModel()
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.settings)) },
+                        onClick = {
+                            showMenu = false
+                            showSettings = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.about)) },
+                        onClick = {
+                            showMenu = false
+                            showAbout = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(R.string.delete_original),
+                                color = Color(0xFFD32F2F)
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            showDeleteOriginal = true
+                        }
+                    )
+                }
+            }
+        } else {
+            // Consejo de la herramienta activa (patron Snapseed: la ayuda vive en la barra)
+            // Idioma efectivo (no el ajuste "system"): el consejo debe seguir al que se ve en pantalla
+            val tipLang = context.resources.configuration.locales[0].language
+            val activeTip = activeTool?.let { Tutorials.tipFor(it.id, tipLang) }
+            if (activeTip != null) {
+                IconButton(onClick = { showTip = activeTip }) {
+                    Icon(Icons.Outlined.HelpOutline, stringResource(R.string.tool_tip), tint = Ui.icon)
+                }
+            }
+            IconButton(onClick = {
+                activeTool = null
+                workingAdj = null
+                workingGeometry = null
+                workingPoint = null
+                activePoint = -1
+                dragValue = Float.NaN
+                workingVignette = Float.NaN
+                strokeX.clear()
+                strokeY.clear()
+                workingEdit = null
+                workingPresetIntensity = Float.NaN
+            }) { Icon(Icons.Outlined.Close, stringResource(R.string.close_tool), tint = Ui.icon) }
+            IconButton(onClick = {
+                when (activeTool) {
+                    EditorTool.CROP -> {
+                        workingGeometry?.let {
+                            geometry = it
+                            persistSession()
+                        }
+                    }
+                    EditorTool.SELECTIVE -> {
+                        val wp = workingPoint
+                        if (wp != null && activePoint >= 0) {
+                            stack.updateSelectivePoint(activePoint, wp)
+                            stackVersion++
+                            persistSession()
+                        }
+                    }
+                    EditorTool.PERSPECTIVE -> {
+                        (workingEdit as? Edit.Perspective)?.let {
+                            stack.apply(it)
+                            stackVersion++
+                            persistSession()
+                        }
+                    }
+                    EditorTool.EXPAND -> {
+                        (workingEdit as? Edit.Expand)?.let {
+                            stack.apply(it)
+                            stackVersion++
+                            persistSession()
+                        }
+                    }
+                    EditorTool.HEAD_POSE -> {
+                        (workingEdit as? Edit.HeadPose)?.let {
+                            stack.apply(it)
+                            stackVersion++
+                            persistSession()
+                        }
+                    }
+                    EditorTool.BRUSH -> {
+                        strokeX.clear()
+                        strokeY.clear()
+                    }
+                    else -> {}
+                }
+                workingAdj = null
+                workingGeometry = null
+                workingPoint = null
+                activePoint = -1
+                activeTool = null
+                workingEdit = null
+                workingPresetIntensity = Float.NaN
+            }) { Icon(Icons.Outlined.Check, stringResource(R.string.done), tint = Ui.icon) }
+        }
+    }
     }
 
     if (showRevertConfirm) {
@@ -4175,7 +4172,8 @@ fun toolCatalog(): List<Triple<EditorTool, androidx.compose.ui.graphics.vector.I
     Triple(EditorTool.FRAME, Icons.Outlined.CropFree, R.string.tool_frame)
 )
 
-/** Barra de favoritos personalizable: iconos de las herramientas elegidas + acceso al editor de la barra. */
+/** Barra de favoritos personalizable: franja horizontal estilo carrusel con icono + texto,
+ * igual que las celdas de la rejilla; incluye acceso al editor de la barra. */
 @Composable
 fun FavoritesBar(
     favorites: List<String>,
@@ -4188,18 +4186,48 @@ fun FavoritesBar(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         favorites.forEach { id ->
             val item = catalog.find { it.first.id == id } ?: return@forEach
-            IconButton(onClick = { onSelect(item.first) }, modifier = Modifier.size(40.dp)) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .width(64.dp)
+                    .clickable { onSelect(item.first) }
+                    .padding(vertical = 4.dp)
+            ) {
                 Icon(item.second, stringResource(item.third), tint = Ui.icon, modifier = Modifier.size(26.dp))
+                Text(
+                    stringResource(item.third),
+                    color = Ui.text,
+                    fontSize = 10.sp,
+                    lineHeight = 12.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
             }
         }
-        IconButton(onClick = onEdit, modifier = Modifier.size(40.dp)) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .width(64.dp)
+                .clickable(onClick = onEdit)
+                .padding(vertical = 4.dp)
+        ) {
             Icon(Icons.Outlined.Edit, stringResource(R.string.customize_toolbar), tint = Ui.textDim, modifier = Modifier.size(24.dp))
+            Text(
+                stringResource(R.string.customize_toolbar),
+                color = Ui.textDim,
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.padding(top = 6.dp)
+            )
         }
     }
 }
