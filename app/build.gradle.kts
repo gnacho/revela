@@ -30,8 +30,8 @@ android {
         applicationId = "app.revela"
         minSdk = 29
         targetSdk = 37
-        versionCode = 4
-        versionName = "0.1.6"
+        versionCode = 5
+        versionName = "0.1.8"
     }
 
     buildTypes {
