@@ -1093,7 +1093,9 @@ fun EditorScreen(
         // compuesto en el primer frame.
         var photoBottomWinPx by remember { mutableFloatStateOf(Float.NaN) }
         var viewportBottomWinPx by remember { mutableFloatStateOf(Float.NaN) }
+        var viewportTopWinPx by remember { mutableFloatStateOf(Float.NaN) }
         var editorBoxBottomWinPx by remember { mutableFloatStateOf(Float.NaN) }
+        var editorBoxTopWinPx by remember { mutableFloatStateOf(Float.NaN) }
         var panelHWinPx by remember { mutableFloatStateOf(Float.NaN) }
         // Traslacion suave SOLO con el cajon de Herramientas: la foto SUBE sin
         // cambiar de tamano hasta quedar ~10px (reales) por encima del borde
@@ -1101,7 +1103,11 @@ fun EditorScreen(
         // (target 0). El calculo de la traslacion esta junto a la imagen.
         Box(modifier = Modifier
             .weight(1f)
-            .onGloballyPositioned { editorBoxBottomWinPx = it.boundsInWindow().bottom }
+            .onGloballyPositioned {
+                val b = it.boundsInWindow()
+                editorBoxBottomWinPx = b.bottom
+                editorBoxTopWinPx = b.top
+            }
         ) {
         BoxWithConstraints(
             modifier = Modifier
@@ -1158,7 +1164,9 @@ fun EditorScreen(
                         .requiredSize(boxWdp, boxHdp)
                         .clipToBounds()
                         .onGloballyPositioned { coords ->
-                            viewportBottomWinPx = coords.boundsInWindow().bottom
+                            val b = coords.boundsInWindow()
+                            viewportBottomWinPx = b.bottom
+                            viewportTopWinPx = b.top
                         }
                         .graphicsLayer {
                             scaleX = viewScale
@@ -1213,22 +1221,36 @@ fun EditorScreen(
                     // layout solo mediria la caja y el cajon solaparia la foto). El
                     // top de reposo del panel sale del layout: borde inferior de la
                     // caja (sin transforms) menos el alto de layout del panel (la
-                    // traslacion de entrada es de capa y no contamina la medida). Si
-                    // la foto se sale del viewport (zoom persistido), manda el borde
-                    // inferior del viewport: la foto sube lo que ocupa el cajon y el
-                    // contenido cubre la zona liberada, sin lanzarla fuera.
+                    // traslacion de entrada es de capa y no contamina la medida).
+                    //
+                    // Solo se traslada la foto si cabe ENTERA en el espacio libre
+                    // sobre el cajon (de la zona de foto al top de reposo del panel).
+                    // Si no cabe (foto que llena el encuadre o zoom), subirla
+                    // descubriria otro trozo de la imagen y daria un salto grande sin
+                    // arreglar nada: se queda quieta y el cajon se desliza por encima.
+                    // El alto dibujado se calcula con los tamanos ya conocidos (la
+                    // imagen con su escala cover y el zoom del usuario); boundsInWindow
+                    // no sirve para decidir esto porque devuelve la caja recortada por
+                    // los clipToBounds. El desplazamiento se topa ademas para que el
+                    // borde superior de la foto no salga de la zona.
+                    val photoDrawnHpx = with(density) { imgHdp.toPx() } * cover * viewScale
                     val targetShiftDp = if (
                         !photoBottomWinPx.isNaN() &&
                         !viewportBottomWinPx.isNaN() &&
+                        !viewportTopWinPx.isNaN() &&
                         !editorBoxBottomWinPx.isNaN() &&
+                        !editorBoxTopWinPx.isNaN() &&
                         !panelHWinPx.isNaN()
                     ) {
                         val panelRestTopWinPx = editorBoxBottomWinPx - panelHWinPx
-                        val bottomEff = minOf(photoBottomWinPx, viewportBottomWinPx)
-                        with(density) {
-                            (bottomEff - panelRestTopWinPx + fotoCajonMargenPx)
-                                .coerceAtLeast(0f).toDp()
-                        }
+                        val freeAreaPx = panelRestTopWinPx - editorBoxTopWinPx
+                        if (photoDrawnHpx <= freeAreaPx) {
+                            val topLimitPx = (viewportTopWinPx - editorBoxTopWinPx).coerceAtLeast(0f)
+                            with(density) {
+                                (photoBottomWinPx - panelRestTopWinPx + fotoCajonMargenPx)
+                                    .coerceIn(0f, topLimitPx).toDp()
+                            }
+                        } else 0.dp
                     } else 0.dp
                     val panelShiftDp by animateDpAsState(
                         targetValue = if (toolsPanelOpen) targetShiftDp else 0.dp,
