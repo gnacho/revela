@@ -1093,13 +1093,15 @@ fun EditorScreen(
         // compuesto en el primer frame.
         var photoBottomWinPx by remember { mutableFloatStateOf(Float.NaN) }
         var viewportBottomWinPx by remember { mutableFloatStateOf(Float.NaN) }
-        var panelTopWinPx by remember { mutableFloatStateOf(Float.NaN) }
+        var editorBoxBottomWinPx by remember { mutableFloatStateOf(Float.NaN) }
+        var panelHWinPx by remember { mutableFloatStateOf(Float.NaN) }
         // Traslacion suave SOLO con el cajon de Herramientas: la foto SUBE sin
         // cambiar de tamano hasta quedar ~10px (reales) por encima del borde
         // superior del cajon. Con Estilos o la barra de favoritos no se mueve
         // (target 0). El calculo de la traslacion esta junto a la imagen.
         Box(modifier = Modifier
             .weight(1f)
+            .onGloballyPositioned { editorBoxBottomWinPx = it.boundsInWindow().bottom }
         ) {
         BoxWithConstraints(
             modifier = Modifier
@@ -1208,19 +1210,23 @@ fun EditorScreen(
                     val fotoCajonMargenPx = 10 // separacion foto-cajon en px reales de pantalla
                     // La separacion se mide sobre el borde DIBUJADO de la foto
                     // (photoBottomWinPx incluye la escala cover del graphicsLayer; el
-                    // layout solo mediria la caja y el cajon solaparia la foto).
-                    // Si la foto se sale del viewport (zoom persistido), su borde
-                    // dibujado queda fuera de pantalla: en ese caso manda el borde
-                    // inferior del viewport, asi la foto sube lo que ocupa el cajon
-                    // y el contenido cubre la zona liberada (scroll), sin lanzarla.
+                    // layout solo mediria la caja y el cajon solaparia la foto). El
+                    // top de reposo del panel sale del layout: borde inferior de la
+                    // caja (sin transforms) menos el alto de layout del panel (la
+                    // traslacion de entrada es de capa y no contamina la medida). Si
+                    // la foto se sale del viewport (zoom persistido), manda el borde
+                    // inferior del viewport: la foto sube lo que ocupa el cajon y el
+                    // contenido cubre la zona liberada, sin lanzarla fuera.
                     val targetShiftDp = if (
                         !photoBottomWinPx.isNaN() &&
                         !viewportBottomWinPx.isNaN() &&
-                        !panelTopWinPx.isNaN()
+                        !editorBoxBottomWinPx.isNaN() &&
+                        !panelHWinPx.isNaN()
                     ) {
+                        val panelRestTopWinPx = editorBoxBottomWinPx - panelHWinPx
                         val bottomEff = minOf(photoBottomWinPx, viewportBottomWinPx)
                         with(density) {
-                            (bottomEff - panelTopWinPx + fotoCajonMargenPx)
+                            (bottomEff - panelRestTopWinPx + fotoCajonMargenPx)
                                 .coerceAtLeast(0f).toDp()
                         }
                     } else 0.dp
@@ -2802,16 +2808,11 @@ fun EditorScreen(
                     .wrapContentHeight()
                     .heightIn(max = toolsPanelMaxH)
                     .onGloballyPositioned { coords ->
-                        // Referencia: el TOP DE REPOSO del panel (el minimo observado
-                        // mientras esta abierto: entra deslizando desde abajo, asi el
-                        // top baja hasta su posicion final). Contra la posicion en
-                        // vuelo la foto perseguiria el muelle y haria cosas raras.
-                        val t = coords.boundsInWindow().top
-                        panelTopWinPx = if (toolsPanelOpen) {
-                            if (panelTopWinPx.isNaN()) t else minOf(panelTopWinPx, t)
-                        } else {
-                            Float.NaN // reset al cerrar para la proxima apertura
-                        }
+                        // Solo el ALTO de layout: la traslacion de entrada del panel
+                        // es un transform de capa (slideInVertically) y no afecta al
+                        // layout; con el top medido en window el muelle lo sobrepasa
+                        // ~20px al entrar y la separacion quedaba inflada.
+                        panelHWinPx = coords.size.height
                     }
                     .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(Ui.sheet)
