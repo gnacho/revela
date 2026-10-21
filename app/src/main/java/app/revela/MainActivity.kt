@@ -2802,7 +2802,16 @@ fun EditorScreen(
                     .wrapContentHeight()
                     .heightIn(max = toolsPanelMaxH)
                     .onGloballyPositioned { coords ->
-                        panelTopWinPx = coords.boundsInWindow().top
+                        // Referencia: el TOP DE REPOSO del panel (el minimo observado
+                        // mientras esta abierto: entra deslizando desde abajo, asi el
+                        // top baja hasta su posicion final). Contra la posicion en
+                        // vuelo la foto perseguiria el muelle y haria cosas raras.
+                        val t = coords.boundsInWindow().top
+                        panelTopWinPx = if (toolsPanelOpen) {
+                            if (panelTopWinPx.isNaN()) t else minOf(panelTopWinPx, t)
+                        } else {
+                            Float.NaN // reset al cerrar para la proxima apertura
+                        }
                     }
                     .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(Ui.sheet)
