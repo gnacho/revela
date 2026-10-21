@@ -1091,9 +1091,8 @@ fun EditorScreen(
         // traslacion se calcula sobre lo que el usuario ve de verdad, no sobre el
         // layout. Se guarda el ultimo valor conocido por si el panel aun no esta
         // compuesto en el primer frame.
-        var photoTopWinPx by remember { mutableFloatStateOf(Float.NaN) }
         var photoBottomWinPx by remember { mutableFloatStateOf(Float.NaN) }
-        var viewportTopWinPx by remember { mutableFloatStateOf(Float.NaN) }
+        var viewportBottomWinPx by remember { mutableFloatStateOf(Float.NaN) }
         var panelTopWinPx by remember { mutableFloatStateOf(Float.NaN) }
         // Traslacion suave SOLO con el cajon de Herramientas: la foto SUBE sin
         // cambiar de tamano hasta quedar ~10px (reales) por encima del borde
@@ -1157,7 +1156,7 @@ fun EditorScreen(
                         .requiredSize(boxWdp, boxHdp)
                         .clipToBounds()
                         .onGloballyPositioned { coords ->
-                            viewportTopWinPx = coords.boundsInWindow().top
+                            viewportBottomWinPx = coords.boundsInWindow().bottom
                         }
                         .graphicsLayer {
                             scaleX = viewScale
@@ -1210,13 +1209,18 @@ fun EditorScreen(
                     // La separacion se mide sobre el borde DIBUJADO de la foto
                     // (photoBottomWinPx incluye la escala cover del graphicsLayer; el
                     // layout solo mediria la caja y el cajon solaparia la foto).
-                    // Sin tope superior: si la foto llena el viewport (o hay zoom
-                    // guardado), subirla es lo pedido: se crea el hueco con el cajon
-                    // aunque la parte alta se recorte (la barra superior esta oculta
-                    // con el cajon abierto).
-                    val targetShiftDp = if (!photoBottomWinPx.isNaN() && !panelTopWinPx.isNaN()) {
+                    // Si la foto se sale del viewport (zoom persistido), su borde
+                    // dibujado queda fuera de pantalla: en ese caso manda el borde
+                    // inferior del viewport, asi la foto sube lo que ocupa el cajon
+                    // y el contenido cubre la zona liberada (scroll), sin lanzarla.
+                    val targetShiftDp = if (
+                        !photoBottomWinPx.isNaN() &&
+                        !viewportBottomWinPx.isNaN() &&
+                        !panelTopWinPx.isNaN()
+                    ) {
+                        val bottomEff = minOf(photoBottomWinPx, viewportBottomWinPx)
                         with(density) {
-                            (photoBottomWinPx - panelTopWinPx + fotoCajonMargenPx)
+                            (bottomEff - panelTopWinPx + fotoCajonMargenPx)
                                 .coerceAtLeast(0f).toDp()
                         }
                     } else 0.dp
@@ -1243,11 +1247,9 @@ fun EditorScreen(
                             modifier = Modifier
                                 .requiredSize(imgWdp, imgHdp)
                                 .onGloballyPositioned { coords ->
-                                    val b = coords.boundsInWindow()
                                     // + panelShiftPx: quitar la traslacion del cajon
                                     // para medir el borde dibujado en reposo
-                                    photoTopWinPx = b.top + panelShiftPx
-                                    photoBottomWinPx = b.bottom + panelShiftPx
+                                    photoBottomWinPx = coords.boundsInWindow().bottom + panelShiftPx
                                 }
                                 .graphicsLayer {
                                     rotationZ = g.totalRotationDeg
