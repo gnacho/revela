@@ -1086,17 +1086,48 @@ fun EditorScreen(
         val toolsPanelOpen = activeTool == null && bottomTab == BottomTab.TOOLS && base != null
         // Geometria real medida en runtime, en coordenadas del Box padre (el de
         // weight(1f)) que contiene la caja de la foto y el cajon de Herramientas.
-        // Medición de la geometria DIBUJADA en coordenadas de ventana (boundsInWindow
-        // incluye los transforms de layer, p.ej. la escala cover de la foto): asi la
-        // traslacion se calcula sobre lo que el usuario ve de verdad, no sobre el
-        // layout. Se guarda el ultimo valor conocido por si el panel aun no esta
-        // compuesto en el primer frame.
-        var photoBottomWinPx by remember { mutableFloatStateOf(Float.NaN) }
-        var viewportBottomWinPx by remember { mutableFloatStateOf(Float.NaN) }
-        var viewportTopWinPx by remember { mutableFloatStateOf(Float.NaN) }
         var editorBoxBottomWinPx by remember { mutableFloatStateOf(Float.NaN) }
         var editorBoxTopWinPx by remember { mutableFloatStateOf(Float.NaN) }
-        var panelHWinPx by remember { mutableFloatStateOf(Float.NaN) }
+        // Alto DIBUJADO de la foto (px): tamano de la imagen con su escala cover y
+        // el zoom del usuario. Se publica desde el layout de la foto.
+        var photoDrawnHpx by remember { mutableFloatStateOf(Float.NaN) }
+        // Separacion real (px de pantalla) entre el borde inferior de la foto y el
+        // cajon de Herramientas.
+        val fotoCajonMargenPx = 10f
+        val layoutDensity = LocalDensity.current
+        // Con el cajon abierto la foto SUBE hasta el tope superior de la zona sin
+        // cambiar de tamano, y el panel se queda con TODO el hueco de debajo (puede
+        // mostrar mas de 4 filas). Todo se calcula con ARITMETICA (centro del
+        // encuadre +/- alto dibujado) y no con boundsInWindow de la foto: esas
+        // cotas vienen RECORTADAS por los clipToBounds, y usarlas aqui realimenta
+        // el desplazamiento (la foto se iba fuera de la pantalla).
+        // Centro del encuadre: la caja de la foto esta centrada en la zona, asi que
+        // su centro es el de la zona mas el pan del usuario. NO se mide con
+        // boundsInWindow: esa caja lleva aplicado el propio desplazamiento del cajon,
+        // y usarlo realimenta el calculo (convergia a la mitad del desplazamiento).
+        val viewportCenterYpx =
+            (editorBoxTopWinPx + editorBoxBottomWinPx) / 2f + viewOffset.y
+        val photoTopPx = viewportCenterYpx - photoDrawnHpx / 2f
+        val photoBottomPx = viewportCenterYpx + photoDrawnHpx / 2f
+        val geomReady = !photoDrawnHpx.isNaN() &&
+            !editorBoxTopWinPx.isNaN() && !editorBoxBottomWinPx.isNaN()
+        val toolsShiftPx = if (!geomReady) 0f else (photoTopPx - editorBoxTopWinPx).coerceAtLeast(0f)
+        // Desplazamiento animado. Se aplica a la CAJA DEL ENCUADRE (no a la foto de
+        // dentro): la ventana de recorte viaja con la foto, asi subirla no la corta.
+        val toolsShiftDp by animateDpAsState(
+            targetValue = if (toolsPanelOpen) with(layoutDensity) { toolsShiftPx.toDp() } else 0.dp,
+            animationSpec = tween(280, easing = FastOutSlowInEasing),
+            label = "toolsShift"
+        )
+        val toolsShiftPxC = with(layoutDensity) { toolsShiftDp.toPx() }
+
+        val toolsPanelHeight = if (!geomReady) {
+            266.dp // valor de referencia mientras no hay medida (4 filas)
+        } else {
+            val panelTopPx = (photoBottomPx - toolsShiftPx) + fotoCajonMargenPx
+            with(layoutDensity) { (editorBoxBottomWinPx - panelTopPx).coerceAtLeast(160f).toDp() }
+        }
+
         // Traslacion suave SOLO con el cajon de Herramientas: la foto SUBE sin
         // cambiar de tamano hasta quedar ~10px (reales) por encima del borde
         // superior del cajon. Con Estilos o la barra de favoritos no se mueve
@@ -1162,18 +1193,18 @@ fun EditorScreen(
                 Box(
                     modifier = Modifier
                         .requiredSize(boxWdp, boxHdp)
-                        .clipToBounds()
-                        .onGloballyPositioned { coords ->
-                            val b = coords.boundsInWindow()
-                            viewportBottomWinPx = b.bottom
-                            viewportTopWinPx = b.top
-                        }
+                        // ORDEN IMPORTANTE: la capa va ANTES del recorte. Si el
+                        // graphicsLayer queda por dentro de clipToBounds, la ventana de
+                        // recorte se queda quieta y la foto sube RECORTADA (solo se veia
+                        // una franja). Con la capa fuera, recorte y contenido viajan
+                        // juntos: la foto se ve entera al desplazarse.
                         .graphicsLayer {
                             scaleX = viewScale
                             scaleY = viewScale
                             translationX = viewOffset.x
-                            translationY = viewOffset.y
+                            translationY = viewOffset.y - toolsShiftPxC
                         }
+                        .clipToBounds()
                         .pointerInput("debugtap") {
                             detectTapGestures { pos ->
                                 android.util.Log.d("revela", "TAP VIEWPORT en $pos tool=$toolNow")
@@ -1207,67 +1238,14 @@ fun EditorScreen(
                             }
                         }
                 ) {
-                    // Traslacion del cajon de Herramientas (termino aditivo, separado
-                    // del pan del usuario): con GEOMETRIA REAL medida en runtime (los
-                    // bordes de la foto y del panel en el Box padre), la foto sube lo
-                    // justo para quedar fotoCajonMargenPx reales por encima del borde
-                    // superior del panel, sin escalarla y sin que su borde superior
-                    // quede por debajo del padding superior. La constante del panel
-                    // (toolsPanelHdp) fallaba en pantallas estrechas: las etiquetas
-                    // largas envolvian y la fila media mas de 60dp.
-                    val fotoCajonMargenPx = 10 // separacion foto-cajon en px reales de pantalla
-                    // La separacion se mide sobre el borde DIBUJADO de la foto
-                    // (photoBottomWinPx incluye la escala cover del graphicsLayer; el
-                    // layout solo mediria la caja y el cajon solaparia la foto). El
-                    // top de reposo del panel sale del layout: borde inferior de la
-                    // caja (sin transforms) menos el alto de layout del panel (la
-                    // traslacion de entrada es de capa y no contamina la medida).
-                    //
-                    // Solo se traslada la foto si cabe ENTERA en el espacio libre
-                    // sobre el cajon (de la zona de foto al top de reposo del panel).
-                    // Si no cabe (foto que llena el encuadre o zoom), subirla
-                    // descubriria otro trozo de la imagen y daria un salto grande sin
-                    // arreglar nada: se queda quieta y el cajon se desliza por encima.
-                    // El alto dibujado se calcula con los tamanos ya conocidos (la
-                    // imagen con su escala cover y el zoom del usuario); boundsInWindow
-                    // no sirve para decidir esto porque devuelve la caja recortada por
-                    // los clipToBounds. El desplazamiento se topa ademas para que el
-                    // borde superior de la foto no salga de la zona.
-                    val photoDrawnHpx = with(density) { imgHdp.toPx() } * cover * viewScale
-                    val targetShiftDp = if (
-                        !photoBottomWinPx.isNaN() &&
-                        !viewportBottomWinPx.isNaN() &&
-                        !viewportTopWinPx.isNaN() &&
-                        !editorBoxBottomWinPx.isNaN() &&
-                        !editorBoxTopWinPx.isNaN() &&
-                        !panelHWinPx.isNaN()
-                    ) {
-                        val panelRestTopWinPx = editorBoxBottomWinPx - panelHWinPx
-                        val freeAreaPx = panelRestTopWinPx - editorBoxTopWinPx
-                        if (photoDrawnHpx <= freeAreaPx) {
-                            val topLimitPx = (viewportTopWinPx - editorBoxTopWinPx).coerceAtLeast(0f)
-                            with(density) {
-                                (photoBottomWinPx - panelRestTopWinPx + fotoCajonMargenPx)
-                                    .coerceIn(0f, topLimitPx).toDp()
-                            }
-                        } else 0.dp
-                    } else 0.dp
-                    val panelShiftDp by animateDpAsState(
-                        targetValue = if (toolsPanelOpen) targetShiftDp else 0.dp,
-                        animationSpec = tween(280, easing = FastOutSlowInEasing),
-                        label = "panelShift"
-                    )
-                    val panelShiftPx = with(density) { panelShiftDp.toPx() }
-
                     Box(
                         modifier = Modifier
                             .requiredSize(frameWdp, frameHdp)
-                            .absoluteOffset(offsetXdp, offsetYdp)
-                            .graphicsLayer { translationY = -panelShiftPx },
+                            .absoluteOffset(offsetXdp, offsetYdp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // La foto NO se escala con el cajon: solo se traslada (la
-                        // translationY aditiva va en el contenedor). Escala = cover.
+                        // La foto NO se escala con el cajon: el desplazamiento se aplica
+                        // a la caja del encuadre (ver graphicsLayer de arriba).
                         Image(
                             bitmap = bmp.asImageBitmap(),
                             contentDescription = null,
@@ -1275,9 +1253,9 @@ fun EditorScreen(
                             modifier = Modifier
                                 .requiredSize(imgWdp, imgHdp)
                                 .onGloballyPositioned { coords ->
-                                    // + panelShiftPx: quitar la traslacion del cajon
-                                    // para medir el borde dibujado en reposo
-                                    photoBottomWinPx = coords.boundsInWindow().bottom + panelShiftPx
+                                    // Alto de layout de la foto (sin transforms): el
+                                    // dibujado es esto por su escala cover y el zoom.
+                                    photoDrawnHpx = coords.size.height * cover * viewScale
                                 }
                                 .graphicsLayer {
                                     rotationZ = g.totalRotationDeg
@@ -2822,20 +2800,10 @@ fun EditorScreen(
             // Altura de CONTENIDO limitada a 4 filas de la rejilla (celda = 8+26+6+12+8 = 60.dp,
             // mas spacer de 4.dp por fila y padding vertical de 10.dp); las 28 herramientas
             // siguen alcanzables con el scroll interno de la rejilla
-            val toolsRowH = 60.dp
-            val toolsPanelMaxH = 10.dp + toolsRowH * 4 + 4.dp * 4
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .wrapContentHeight()
-                    .heightIn(max = toolsPanelMaxH)
-                    .onGloballyPositioned { coords ->
-                        // Solo el ALTO de layout: la traslacion de entrada del panel
-                        // es un transform de capa (slideInVertically) y no afecta al
-                        // layout; con el top medido en window el muelle lo sobrepasa
-                        // ~20px al entrar y la separacion quedaba inflada.
-                        panelHWinPx = coords.size.height.toFloat()
-                    }
+                    .height(toolsPanelHeight)
                     .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(Ui.sheet)
             ) {
