@@ -2812,7 +2812,7 @@ fun EditorScreen(
                         // es un transform de capa (slideInVertically) y no afecta al
                         // layout; con el top medido en window el muelle lo sobrepasa
                         // ~20px al entrar y la separacion quedaba inflada.
-                        panelHWinPx = coords.size.height
+                        panelHWinPx = coords.size.height.toFloat()
                     }
                     .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(Ui.sheet)
