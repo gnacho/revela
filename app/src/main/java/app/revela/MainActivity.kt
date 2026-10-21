@@ -1091,6 +1091,9 @@ fun EditorScreen(
         // Alto DIBUJADO de la foto (px): tamano de la imagen con su escala cover y
         // el zoom del usuario. Se publica desde el layout de la foto.
         var photoDrawnHpx by remember { mutableFloatStateOf(Float.NaN) }
+        // Alto de LAYOUT del cajon: es lo que mide su contenido (sin estirarlo), y con
+        // el se calcula cuanto tiene que subir la foto.
+        var panelHWinPx by remember { mutableFloatStateOf(Float.NaN) }
         // Separacion real (px de pantalla) entre el borde inferior de la foto y el
         // cajon de Herramientas.
         val fotoCajonMargenPx = 10f
@@ -1111,7 +1114,26 @@ fun EditorScreen(
         val photoBottomPx = viewportCenterYpx + photoDrawnHpx / 2f
         val geomReady = !photoDrawnHpx.isNaN() &&
             !editorBoxTopWinPx.isNaN() && !editorBoxBottomWinPx.isNaN()
-        val toolsShiftPx = if (!geomReady) 0f else (photoTopPx - editorBoxTopWinPx).coerceAtLeast(0f)
+        // El cajon mide lo que mide su contenido, sin estirarlo hasta abajo (eso dejaba
+        // un hueco muerto bajo la ultima fila). La foto sube SOLO lo justo para quedar
+        // fotoCajonMargenPx por encima del cajon, sin irse al techo. Su alto maximo es
+        // el hueco que quedaria con la foto pegada arriba; si el contenido no cabe ahi,
+        // la rejilla mantiene su scroll interno.
+        val toolsPanelMaxH = if (!geomReady) {
+            266.dp // valor de referencia mientras no hay medida
+        } else {
+            with(layoutDensity) {
+                ((editorBoxBottomWinPx - editorBoxTopWinPx) - photoDrawnHpx - fotoCajonMargenPx)
+                    .coerceAtLeast(160f).toDp()
+            }
+        }
+        val toolsShiftPx = if (!geomReady || panelHWinPx.isNaN()) {
+            0f
+        } else {
+            val panelTopPx = editorBoxBottomWinPx - panelHWinPx
+            (photoBottomPx - (panelTopPx - fotoCajonMargenPx))
+                .coerceIn(0f, (photoTopPx - editorBoxTopWinPx).coerceAtLeast(0f))
+        }
         // Desplazamiento animado. Se aplica a la CAJA DEL ENCUADRE (no a la foto de
         // dentro): la ventana de recorte viaja con la foto, asi subirla no la corta.
         val toolsShiftDp by animateDpAsState(
@@ -1120,13 +1142,6 @@ fun EditorScreen(
             label = "toolsShift"
         )
         val toolsShiftPxC = with(layoutDensity) { toolsShiftDp.toPx() }
-
-        val toolsPanelHeight = if (!geomReady) {
-            266.dp // valor de referencia mientras no hay medida (4 filas)
-        } else {
-            val panelTopPx = (photoBottomPx - toolsShiftPx) + fotoCajonMargenPx
-            with(layoutDensity) { (editorBoxBottomWinPx - panelTopPx).coerceAtLeast(160f).toDp() }
-        }
 
         // Traslacion suave SOLO con el cajon de Herramientas: la foto SUBE sin
         // cambiar de tamano hasta quedar ~10px (reales) por encima del borde
@@ -2796,19 +2811,26 @@ fun EditorScreen(
             ) + fadeOut(tween(150))
         ) {
             // Panel de herramientas: solo la rejilla completa; la fila de favoritos
-            // grande que habia aqui se consideraba un bug (duplicaba la FavoritesBar)
-            // Altura de CONTENIDO limitada a 4 filas de la rejilla (celda = 8+26+6+12+8 = 60.dp,
-            // mas spacer de 4.dp por fila y padding vertical de 10.dp); las 28 herramientas
-            // siguen alcanzables con el scroll interno de la rejilla
+            // grande que habia aqui se consideraba un bug (duplicaba la FavoritesBar).
+            // Alto de CONTENIDO (wrapContentHeight): entra el numero de filas que
+            // necesite la rejilla y no queda hueco muerto por debajo. Si el contenido
+            // no cabe en el hueco que deja la foto, se queda en el maximo y la rejilla
+            // mantiene su scroll interno.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(toolsPanelHeight)
+                    .wrapContentHeight()
+                    .heightIn(max = toolsPanelMaxH)
+                    .onGloballyPositioned { coords ->
+                        // Alto de LAYOUT: la traslacion de entrada es de capa y no
+                        // contamina la medida.
+                        panelHWinPx = coords.size.height.toFloat()
+                    }
                     .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(Ui.sheet)
             ) {
                 ToolsGrid(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxWidth(),
                     favorites = favorites.toSet(),
                     onToggleFavorite = { toggleFavorite(it) },
                     onSelect = {
