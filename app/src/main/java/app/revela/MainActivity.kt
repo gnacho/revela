@@ -1208,21 +1208,18 @@ fun EditorScreen(
                     // largas envolvian y la fila media mas de 60dp.
                     val fotoCajonMargenPx = 10 // separacion foto-cajon en px reales de pantalla
                     // La separacion se mide sobre el borde DIBUJADO de la foto
-                    // (photoBottomWinPx incluye la escala cover; el layout solo
-                    // mediria la caja y el cajon solaparia la foto dibujada).
-                    val rawShiftDp = if (!photoBottomWinPx.isNaN() && !panelTopWinPx.isNaN()) {
+                    // (photoBottomWinPx incluye la escala cover del graphicsLayer; el
+                    // layout solo mediria la caja y el cajon solaparia la foto).
+                    // Sin tope superior: si la foto llena el viewport (o hay zoom
+                    // guardado), subirla es lo pedido: se crea el hueco con el cajon
+                    // aunque la parte alta se recorte (la barra superior esta oculta
+                    // con el cajon abierto).
+                    val targetShiftDp = if (!photoBottomWinPx.isNaN() && !panelTopWinPx.isNaN()) {
                         with(density) {
                             (photoBottomWinPx - panelTopWinPx + fotoCajonMargenPx)
                                 .coerceAtLeast(0f).toDp()
                         }
                     } else 0.dp
-                    // Limite: el borde superior de la foto no sube por encima del
-                    // padding vertical (14.dp) de la caja
-                    val maxShiftDp = if (!photoTopWinPx.isNaN() && !viewportTopWinPx.isNaN()) {
-                        with(density) { (photoTopWinPx - viewportTopWinPx).toDp() }
-                            .minus(14.dp).coerceAtLeast(0.dp)
-                    } else 0.dp
-                    val targetShiftDp = rawShiftDp.coerceAtMost(maxShiftDp)
                     val panelShiftDp by animateDpAsState(
                         targetValue = if (toolsPanelOpen) targetShiftDp else 0.dp,
                         animationSpec = tween(280, easing = FastOutSlowInEasing),
