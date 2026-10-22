@@ -150,7 +150,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.annotation.StringRes
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -410,22 +412,45 @@ fun TabButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Text(
-        label,
-        color = when {
-            !enabled -> Ui.line
-            selected -> Ui.accent
-            else -> Ui.textDim
-        },
-        fontSize = 14.sp,
-        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        letterSpacing = 1.sp,
-        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 4.dp)
-    )
+    // La etiqueta se autoencoge hasta caber en UNA linea (issue #3): en pantallas
+    // estrechas "HERRAMIENTAS" se partia en dos. La medida es exacta con
+    // TextMeasurer; si aun asi no cupiera, maxLines=1 la recorta en vez de partirla.
+    val textMeasurer = rememberTextMeasurer()
+    val weight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+    BoxWithConstraints(modifier = modifier) {
+        var fontSize = 14.sp
+        while (fontSize.value > 9f) {
+            val w = textMeasurer.measure(
+                text = label,
+                style = TextStyle(
+                    fontSize = fontSize,
+                    fontWeight = weight,
+                    letterSpacing = 1.sp
+                )
+            ).size.width
+            if (w <= constraints.maxWidth) break
+            fontSize = (fontSize.value - 0.5f).sp
+        }
+        Text(
+            label,
+            color = when {
+                !enabled -> Ui.line
+                selected -> Ui.accent
+                else -> Ui.textDim
+            },
+            fontSize = fontSize,
+            fontWeight = weight,
+            letterSpacing = 1.sp,
+            maxLines = 1,
+            softWrap = false,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(vertical = 4.dp)
+        )
+    }
 }
 
 /** Parametros de la herramienta Ajustar (gesto vertical para elegir, horizontal para valor). */
