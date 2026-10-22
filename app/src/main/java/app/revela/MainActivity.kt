@@ -1129,12 +1129,14 @@ fun EditorScreen(
         // encuadre +/- alto dibujado) y no con boundsInWindow de la foto: esas
         // cotas vienen RECORTADAS por los clipToBounds, y usarlas aqui realimenta
         // el desplazamiento (la foto se iba fuera de la pantalla).
-        // Centro del encuadre: la caja de la foto esta centrada en la zona, asi que
-        // su centro es el de la zona mas el pan del usuario. NO se mide con
-        // boundsInWindow: esa caja lleva aplicado el propio desplazamiento del cajon,
-        // y usarlo realimenta el calculo (convergia a la mitad del desplazamiento).
+        // Centro del encuadre: la caja de la foto esta centrada en el area LIBRE (la
+        // zona menos la franja inferior de 104dp), no en el area completa; por eso se
+        // resta media franja al centro de la zona. NO se mide con boundsInWindow: esa
+        // caja lleva aplicado el propio desplazamiento del cajon y realimentaria el
+        // calculo (convergia a la mitad del desplazamiento).
+        val franjaHpx = with(layoutDensity) { 104.dp.toPx() }
         val viewportCenterYpx =
-            (editorBoxTopWinPx + editorBoxBottomWinPx) / 2f + viewOffset.y
+            (editorBoxTopWinPx + editorBoxBottomWinPx - franjaHpx) / 2f + viewOffset.y
         val photoTopPx = viewportCenterYpx - photoDrawnHpx / 2f
         val photoBottomPx = viewportCenterYpx + photoDrawnHpx / 2f
         val geomReady = !photoDrawnHpx.isNaN() &&
@@ -1180,12 +1182,24 @@ fun EditorScreen(
                 editorBoxTopWinPx = b.top
             }
         ) {
+        // El encuadre se contiene en el area LIBRE: la franja inferior (favoritos,
+        // carrusel de Estilos o el cajon de Herramientas) es un overlay solido de
+        // 104dp pegado abajo y TAPARIA la foto si esta ocupara todo el alto. En
+        // apaisado la foto contenida llenaba el alto y la franja le recortaba la
+        // mitad inferior. Con el padding inferior la foto siempre queda entera
+        // encima de la franja, con su tamaño intacto (el cajon sigue subiendo
+        // hasta 10px bajo la foto con el desplazamiento ya existente).
         BoxWithConstraints(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(
+                    start = 16.dp,
+                    top = 14.dp,
+                    end = 16.dp,
+                    bottom = 14.dp + if (base != null) 104.dp else 0.dp
+                ),
             contentAlignment = Alignment.Center
         ) {
             val density = LocalDensity.current
